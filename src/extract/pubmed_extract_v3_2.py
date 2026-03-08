@@ -8,7 +8,7 @@ Usage:
   python pubmed_extract_v3_2.py scheduled
 
 Requirements:
-  - NCBI_API_KEY environment variable (or pass via --api-key)
+  - cfg.NCBI_API_KEY environment variable (or pass via --api-key)
   - pip install requests pandas
 
 Version History:
@@ -36,65 +36,19 @@ from ftplib import FTP
 from urllib.parse import urlencode
 from typing import Dict, List, Optional
 
+from config import Config  # #changed - centralised configuration
+
 # =============================================================================
-# CONSTANTS
+# CONFIGURATION (loaded from config.py)
 # =============================================================================
 
-# URLs
-BASE_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-OA_FILE_LIST_URL = "https://ftp.ncbi.nlm.nih.gov/pub/pmc/oa_file_list.csv"
-FTP_BASE_URL = "https://ftp.ncbi.nlm.nih.gov/pub/pmc/"
+cfg = Config()  # #changed - module-level config singleton
 
-# Misc
-RATE_LIMIT_DELAY = 0.34
-FTP_RATE_LIMIT_DELAY = 1.5
+# Static constants (not path- or key-dependent)
 DATABASE = "pubmed"
 RETMODE_XML = "xml"
 USE_HISTORY = "y"
-
-# Directory paths - configurable via --base-dir
-DRIVE_BASE = None
-XML_PATH = None
-LOG_PATH = None
-GROUND_TRUTH_PATH = None
-TRACKING_FILE = None
-MISSING_PMCID_LOG = None
-SUPPLEMENTARY_PATH = None
-OA_FILE_LIST_LOCAL = None
-
-# API Key - set from environment or CLI argument
-NCBI_API_KEY = None
-
-# Pathogen configurations
-PATHOGENS = {
-    "hepatitis_a": {
-        "name": "Hepatitis A",
-        "mesh": "Hepatitis A",
-        "term": "Hepatitis A"
-    },
-    "hepatitis_e": {
-        "name": "Hepatitis E",
-        "mesh": "Hepatitis E",
-        "term": "Hepatitis E"
-    }
-}
-
-# PMC specific URLs
-PMC_OA_SERVICE = "https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi"
 PMC_PDF_BASE = "https://www.ncbi.nlm.nih.gov/pmc/articles"
-
-# Enhanced rate limiting
-PMC_RATE_LIMIT_DELAY = 1.0
-MAX_RETRIES = 3
-BATCH_SIZE = 10
-
-# File size limits (in MB)
-MAX_XML_SIZE_MB = 10
-COMPRESS_THRESHOLD_MB = 1
-
-# Logging configuration
-LOG_LEVEL = logging.INFO
-LOG_FORMAT = '%(asctime)s - %(levelname)s - %(funcName)s - %(message)s'
 
 
 # =============================================================================
@@ -102,32 +56,19 @@ LOG_FORMAT = '%(asctime)s - %(levelname)s - %(funcName)s - %(message)s'
 # =============================================================================
 
 def initialise_paths(base_dir: str):
-    """Set all directory paths from the given base directory."""
-    global DRIVE_BASE, XML_PATH, LOG_PATH, GROUND_TRUTH_PATH
-    global TRACKING_FILE, MISSING_PMCID_LOG, SUPPLEMENTARY_PATH, OA_FILE_LIST_LOCAL
-
-    DRIVE_BASE = base_dir
-    XML_PATH = f"{DRIVE_BASE}/xml"
-    LOG_PATH = f"{DRIVE_BASE}/logs"
-    GROUND_TRUTH_PATH = f"{DRIVE_BASE}/ground_truth"
-    TRACKING_FILE = f"{DRIVE_BASE}/download_tracker.csv"
-    MISSING_PMCID_LOG = f"{DRIVE_BASE}/missing_pmcids"
-    SUPPLEMENTARY_PATH = f"{DRIVE_BASE}/supplementary"
-    OA_FILE_LIST_LOCAL = f"{SUPPLEMENTARY_PATH}/oa_file_list.csv"
+    """Re-initialise config with the given base directory."""  #changed
+    global cfg
+    cfg = Config(base_dir=base_dir)
 
 
 def initialise_api_key(api_key: str = None):
-    """Set NCBI API key from argument or environment variable."""
-    global NCBI_API_KEY
-
+    """Override NCBI API key if provided via CLI argument."""  #changed
     if api_key:
-        NCBI_API_KEY = api_key
-    else:
-        NCBI_API_KEY = os.environ.get('NCBI_API_KEY')
+        cfg.NCBI_API_KEY = api_key
 
-    if not NCBI_API_KEY:
+    if not cfg.NCBI_API_KEY:
         logging.warning("No NCBI API key provided. Rate limits will be stricter.")
-        logging.warning("Set NCBI_API_KEY environment variable or use --api-key")
+        logging.warning("Set cfg.NCBI_API_KEY environment variable or use --api-key")
 
 
 # =============================================================================
@@ -135,14 +76,14 @@ def initialise_api_key(api_key: str = None):
 # =============================================================================
 
 def setup_logging():
-    os.makedirs(LOG_PATH, exist_ok=True)
-    os.makedirs(MISSING_PMCID_LOG, exist_ok=True)
+    os.makedirs(cfg.LOG_PATH, exist_ok=True)
+    os.makedirs(cfg.MISSING_PMCID_LOG, exist_ok=True)
 
-    log_filename = f"{LOG_PATH}/pubmed_download_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_filename = f"{cfg.LOG_PATH}/pubmed_download_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
     logging.basicConfig(
-        level=LOG_LEVEL,
-        format=LOG_FORMAT,
+        level=cfg.LOG_LEVEL,
+        format=cfg.LOG_FORMAT,
         handlers=[
             logging.FileHandler(log_filename, encoding='utf-8'),
             logging.StreamHandler()
@@ -155,10 +96,10 @@ def setup_logging():
 
 def check_project_dir():
     try:
-        os.makedirs(XML_PATH, exist_ok=True)
-        os.makedirs(LOG_PATH, exist_ok=True)
-        os.makedirs(MISSING_PMCID_LOG, exist_ok=True)
-        logging.info(f"Project directories verified under {DRIVE_BASE}")
+        os.makedirs(cfg.XML_PATH, exist_ok=True)
+        os.makedirs(cfg.LOG_PATH, exist_ok=True)
+        os.makedirs(cfg.MISSING_PMCID_LOG, exist_ok=True)
+        logging.info(f"Project directories verified under {cfg.DRIVE_BASE}")
         return True
     except Exception as e:
         logging.error(f"Failed to create project directories: {str(e)}")
@@ -171,7 +112,7 @@ def check_project_dir():
 
 def build_pathogen_search_query(pathogen_key):
     """Build PubMed search query for single pathogen."""
-    pathogen = PATHOGENS[pathogen_key]
+    pathogen = cfg.PATHOGENS[pathogen_key]
     term = pathogen['term']
     mesh = pathogen['mesh']
 
@@ -196,7 +137,7 @@ def fetch_pmc_fulltext_xml(pmcid, retry_count=0):
         pmcid_clean = pmcid.replace('PMC', '', 1) if pmcid.startswith('PMC') else pmcid
         logging.info(f"Fetching full text XML for {pmcid_clean}")
 
-        time.sleep(PMC_RATE_LIMIT_DELAY)
+        time.sleep(cfg.PMC_RATE_LIMIT_DELAY)
         response = requests.get(url, timeout=30)
 
         if response.status_code == 200:
@@ -218,9 +159,9 @@ def fetch_pmc_fulltext_xml(pmcid, retry_count=0):
         pmcid_clean = pmcid.replace('PMC', '', 1) if pmcid.startswith('PMC') else pmcid
         logging.error(f"Failed to fetch full-text for PMC{pmcid_clean}: {str(e)}")
 
-        if retry_count < MAX_RETRIES:
+        if retry_count < cfg.MAX_RETRIES:
             logging.info(f"Retrying PMC{pmcid_clean} (attempt {retry_count + 1})")
-            time.sleep(RATE_LIMIT_DELAY * 2)
+            time.sleep(cfg.RATE_LIMIT_DELAY * 2)
             return fetch_pmc_fulltext_xml(pmcid, retry_count + 1)
 
         return None
@@ -229,7 +170,7 @@ def fetch_pmc_fulltext_xml(pmcid, retry_count=0):
 def save_xml_with_compression(xml_content, identifier, search_date):
     try:
         filename = f"{identifier}_{search_date}.xml"
-        filepath = os.path.join(XML_PATH, filename)
+        filepath = os.path.join(cfg.XML_PATH, filename)
 
         if os.path.exists(filepath) or os.path.exists(f"{filepath}.gz"):
             logging.info(f"XML for {identifier} already exists - skipping")
@@ -241,7 +182,7 @@ def save_xml_with_compression(xml_content, identifier, search_date):
         file_size_mb = os.path.getsize(filepath) / (1024 * 1024)
         logging.info(f"Saved XML for {identifier}: {file_size_mb:.2f} MB")
 
-        if file_size_mb > COMPRESS_THRESHOLD_MB:
+        if file_size_mb > cfg.COMPRESS_THRESHOLD_MB:
             compressed_filepath = f"{filepath}.gz"
             with open(filepath, 'rb') as f_in:
                 with gzip.open(compressed_filepath, 'wb') as f_out:
@@ -328,7 +269,7 @@ def convert_pmid_to_pmcid(pmid, retry_count=0):
         url = construct_elink_url(pmid)
 
         logging.debug(f"Converting PMID {pmid} to PMCID")
-        time.sleep(RATE_LIMIT_DELAY)
+        time.sleep(cfg.RATE_LIMIT_DELAY)
 
         response = requests.get(url, timeout=30)
         if response.status_code != 200:
@@ -359,9 +300,9 @@ def convert_pmid_to_pmcid(pmid, retry_count=0):
     except Exception as e:
         logging.error(f"Failed to convert PMID {pmid} to PMCID: {str(e)}")
 
-        if retry_count < MAX_RETRIES:
+        if retry_count < cfg.MAX_RETRIES:
             logging.info(f"Retrying PMID {pmid} (attempt {retry_count + 1})")
-            time.sleep(RATE_LIMIT_DELAY * 2)
+            time.sleep(cfg.RATE_LIMIT_DELAY * 2)
             return convert_pmid_to_pmcid(pmid, retry_count + 1)
     return None
 
@@ -402,7 +343,7 @@ def track_missing_pmcid(tracking_df, pmid, reason):
         error_message=reason
     )
 
-    missing_log_file = f"{MISSING_PMCID_LOG}/missing_pmcids_{datetime.now().strftime('%Y%m%d')}.csv"
+    missing_log_file = f"{cfg.MISSING_PMCID_LOG}/missing_pmcids_{datetime.now().strftime('%Y%m%d')}.csv"
 
     missing_record = {
         'pmid': pmid,
@@ -423,7 +364,7 @@ def track_missing_pmcid(tracking_df, pmid, reason):
 
 
 def generate_download_summary(tracking_df, date_start, date_end):
-    summary_file = f"{LOG_PATH}/summary_{datetime.now().strftime('%Y%m%d')}.txt"
+    summary_file = f"{cfg.LOG_PATH}/summary_{datetime.now().strftime('%Y%m%d')}.txt"
 
     current_date_str = datetime.now().strftime('%Y-%m-%d')
     current_run = tracking_df[tracking_df['download_date'].str.contains(current_date_str)]
@@ -465,9 +406,9 @@ def generate_download_summary(tracking_df, date_start, date_end):
 
     FILES GENERATED:
     ----------------
-    Tracking File: {TRACKING_FILE}
-    Missing PMCIDs Log: {MISSING_PMCID_LOG}/missing_pmcids_{datetime.now().strftime('%Y%m%d')}.csv
-    XML Files Directory: {XML_PATH}
+    Tracking File: {cfg.TRACKING_FILE}
+    Missing PMCIDs Log: {cfg.MISSING_PMCID_LOG}/missing_pmcids_{datetime.now().strftime('%Y%m%d')}.csv
+    XML Files Directory: {cfg.XML_PATH}
 
     =========================================================
     """
@@ -491,9 +432,9 @@ def construct_elink_url(pmid):
         'id': pmid,
         'retmode': 'xml',
     }
-    if NCBI_API_KEY:
-        params['api_key'] = NCBI_API_KEY
-    return BASE_URL + 'elink.fcgi?' + urlencode(params)
+    if cfg.NCBI_API_KEY:
+        params['api_key'] = cfg.NCBI_API_KEY
+    return cfg.EUTILS_BASE_URL + 'elink.fcgi?' + urlencode(params)
 
 
 def construct_pmc_fetch_url(pmcid):
@@ -503,9 +444,9 @@ def construct_pmc_fetch_url(pmcid):
         'id': pmcid_clean,
         'retmode': 'xml',
     }
-    if NCBI_API_KEY:
-        params['api_key'] = NCBI_API_KEY
-    return BASE_URL + 'efetch.fcgi?' + urlencode(params)
+    if cfg.NCBI_API_KEY:
+        params['api_key'] = cfg.NCBI_API_KEY
+    return cfg.EUTILS_BASE_URL + 'efetch.fcgi?' + urlencode(params)
 
 
 def construct_esearch_url(database, term, mindate, maxdate, datetype, retmax, usehistory):
@@ -519,9 +460,9 @@ def construct_esearch_url(database, term, mindate, maxdate, datetype, retmax, us
         'usehistory': usehistory,
         'retmode': 'xml',
     }
-    if NCBI_API_KEY:
-        params['api_key'] = NCBI_API_KEY
-    return BASE_URL + 'esearch.fcgi?' + urlencode(params)
+    if cfg.NCBI_API_KEY:
+        params['api_key'] = cfg.NCBI_API_KEY
+    return cfg.EUTILS_BASE_URL + 'esearch.fcgi?' + urlencode(params)
 
 
 def construct_efetch_url(database, pmids, retmode):
@@ -531,9 +472,9 @@ def construct_efetch_url(database, pmids, retmode):
         'id': id_string,
         'retmode': retmode,
     }
-    if NCBI_API_KEY:
-        params['api_key'] = NCBI_API_KEY
-    return BASE_URL + 'efetch.fcgi?' + urlencode(params)
+    if cfg.NCBI_API_KEY:
+        params['api_key'] = cfg.NCBI_API_KEY
+    return cfg.EUTILS_BASE_URL + 'efetch.fcgi?' + urlencode(params)
 
 
 def make_http_request(url, retry_count=0):
@@ -543,9 +484,9 @@ def make_http_request(url, retry_count=0):
         return response.text
     except requests.exceptions.RequestException as e:
         logging.error(f"HTTP request failed: {str(e)}")
-        if retry_count < MAX_RETRIES:
+        if retry_count < cfg.MAX_RETRIES:
             logging.info(f"Retrying...(attempt {retry_count + 1})")
-            time.sleep(RATE_LIMIT_DELAY * (retry_count + 1))
+            time.sleep(cfg.RATE_LIMIT_DELAY * (retry_count + 1))
             return make_http_request(url, retry_count + 1)
         raise
 
@@ -555,9 +496,9 @@ def make_http_request(url, retry_count=0):
 # =============================================================================
 
 def load_tracking_data():
-    if os.path.exists(TRACKING_FILE):
+    if os.path.exists(cfg.TRACKING_FILE):
         try:
-            df = pd.read_csv(TRACKING_FILE)
+            df = pd.read_csv(cfg.TRACKING_FILE)
             logging.info(f"Loaded {len(df)} existing records from tracking file")
             return df
         except Exception as e:
@@ -591,7 +532,7 @@ def update_tracking_data(df, pmid, pmcid, pmcid_status, fulltext_xml_status, err
 
 def save_tracking_data(df):
     try:
-        df.to_csv(TRACKING_FILE, index=False)
+        df.to_csv(cfg.TRACKING_FILE, index=False)
         logging.info(f"Saved tracking data with {len(df)} records")
     except Exception as e:
         logging.error(f"Failed to save tracking data: {str(e)}")
@@ -806,7 +747,7 @@ def load_oa_file_list(force_refresh: bool = False) -> Optional[Dict[str, str]]:
     Download or load cached oa_file_list.csv.
     Returns: Dictionary mapping PMCID -> FTP path, or None if failed.
     """
-    cache_path = Path(OA_FILE_LIST_LOCAL)
+    cache_path = Path(cfg.OA_FILE_LIST_LOCAL)
     cache_max_age_days = 7
 
     if cache_path.is_file() and not force_refresh:
@@ -824,11 +765,11 @@ def load_oa_file_list(force_refresh: bool = False) -> Optional[Dict[str, str]]:
         logging.info("Downloading OA file list from NCBI FTP...")
 
         try:
-            response = requests.get(OA_FILE_LIST_URL, timeout=120)
+            response = requests.get(cfg.OA_FILE_LIST_URL, timeout=120)
 
             if response.status_code == 200:
-                Path(SUPPLEMENTARY_PATH).mkdir(parents=True, exist_ok=True)
-                with open(OA_FILE_LIST_LOCAL, 'w', encoding='utf-8') as f:
+                Path(cfg.SUPPLEMENTARY_PATH).mkdir(parents=True, exist_ok=True)
+                with open(cfg.OA_FILE_LIST_LOCAL, 'w', encoding='utf-8') as f:
                     f.write(response.text)
             else:
                 logging.error(f"Failed to download OA file list: HTTP {response.status_code}")
@@ -842,7 +783,7 @@ def load_oa_file_list(force_refresh: bool = False) -> Optional[Dict[str, str]]:
             logging.warning("Using existing cache despite download failure")
 
     try:
-        oa_df = pd.read_csv(OA_FILE_LIST_LOCAL,
+        oa_df = pd.read_csv(cfg.OA_FILE_LIST_LOCAL,
                             skiprows=1,
                             names=['ftp_path', 'citation', 'pmcid', 'timestamp', 'pmid', 'license'],
                             dtype=str,
@@ -867,8 +808,8 @@ def load_oa_file_list(force_refresh: bool = False) -> Optional[Dict[str, str]]:
 def download_supplementary_package(pmcid: str, ftp_path: str, retry_count=0) -> Dict:
     """Download .tar.gz package from FTP and extract supplementary files only."""
 
-    full_url = FTP_BASE_URL + ftp_path
-    output_dir = f"{SUPPLEMENTARY_PATH}/{pmcid}"
+    full_url = cfg.FTP_BASE_URL + ftp_path
+    output_dir = f"{cfg.SUPPLEMENTARY_PATH}/{pmcid}"
     temp_tar_path = f"{output_dir}/temp_package.tar.gz"
     max_retries = 3
 
@@ -892,7 +833,7 @@ def download_supplementary_package(pmcid: str, ftp_path: str, retry_count=0) -> 
                     result['manifest'] = manifest
                     return result
 
-        time.sleep(FTP_RATE_LIMIT_DELAY)
+        time.sleep(cfg.FTP_RATE_LIMIT_DELAY)
 
         logging.info(f"Downloading supplementary package for {pmcid}")
         response = requests.get(full_url, timeout=60, stream=True)
@@ -940,7 +881,7 @@ def download_supplementary_package(pmcid: str, ftp_path: str, retry_count=0) -> 
 
         if retry_count < max_retries:
             logging.info(f"Retrying {pmcid} (attempt {retry_count + 1})")
-            time.sleep(FTP_RATE_LIMIT_DELAY * 2)
+            time.sleep(cfg.FTP_RATE_LIMIT_DELAY * 2)
             return download_supplementary_package(pmcid, ftp_path, retry_count + 1)
 
         result['status'] = 'failed'
@@ -1068,7 +1009,7 @@ def batch_download_supplementary(pmcid_list: List[str]) -> Optional[Dict]:
         'total_files_extracted': 0
     }
 
-    Path(SUPPLEMENTARY_PATH).mkdir(parents=True, exist_ok=True)
+    Path(cfg.SUPPLEMENTARY_PATH).mkdir(parents=True, exist_ok=True)
     logging.info("Loading OA file list for supplementary lookup...")
     pmcid_to_ftp = load_oa_file_list()
 
@@ -1144,7 +1085,7 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
     if date_start is None or date_end is None:
         date_start, date_end = get_previous_month_date_range()
 
-    logging.info(f"Starting search for {PATHOGENS[pathogen_key]['name']}")
+    logging.info(f"Starting search for {cfg.PATHOGENS[pathogen_key]['name']}")
     logging.info(f"Date range: {date_start} to {date_end}")
 
     search_query = build_pathogen_search_query(pathogen_key)
@@ -1163,7 +1104,7 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
     try:
         logging.info("Executing PubMed search...")
         response = make_http_request(search_url)
-        time.sleep(RATE_LIMIT_DELAY)
+        time.sleep(cfg.RATE_LIMIT_DELAY)
 
         total_count = extract_total_count(response)
         pmid_list = extract_pmid_list(response)
@@ -1250,7 +1191,7 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
                 failed_count += 1
                 logging.error(f"Failed to save full-text for {pmcid}")
 
-            time.sleep(RATE_LIMIT_DELAY)
+            time.sleep(cfg.RATE_LIMIT_DELAY)
 
             if i % 10 == 0:
                 save_tracking_data(tracking_df)
@@ -1292,12 +1233,12 @@ def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed 
 
     Args:
         csv_path: Path to CSV file containing PMCIDs.
-                  If None, falls back to scanning GROUND_TRUTH_PATH.
+                  If None, falls back to scanning cfg.GROUND_TRUTH_PATH.
 
     Returns:
         Summary dict with success/failure counts.
     """
-    OUTPUT_PATH = Path(XML_PATH) / "ground_truth"
+    OUTPUT_PATH = Path(cfg.XML_PATH) / "ground_truth"
     OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
     success_count = 0
@@ -1315,8 +1256,8 @@ def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed 
             print(f"Error: {e}")
             return None
     else:  #changed - backward compatibility fallback
-        logging.info(f"Step 1: No CSV provided - falling back to directory scan of {GROUND_TRUTH_PATH}")
-        pmcid_list = collect_pmcids_from_directory(directory=GROUND_TRUTH_PATH)
+        logging.info(f"Step 1: No CSV provided - falling back to directory scan of {cfg.GROUND_TRUTH_PATH}")
+        pmcid_list = collect_pmcids_from_directory(directory=cfg.GROUND_TRUTH_PATH)
 
     if not pmcid_list:
         logging.error("No PMCIDs to process")
@@ -1431,10 +1372,10 @@ Examples:
 
     # Global arguments
     parser.add_argument('--base-dir', type=str,
-                        default=os.environ.get('PUBMED_BASE_DIR', './pubmed_data'),
-                        help='Base directory for all output (default: ./pubmed_data or $PUBMED_BASE_DIR)')
+                        default=cfg.DRIVE_BASE,  #changed - use config default
+                        help='Base directory for all output (default: from config.py or $PUBMED_BASE_DIR)')
     parser.add_argument('--api-key', type=str, default=None,
-                        help='NCBI API key (default: $NCBI_API_KEY env var)')
+                        help='NCBI API key (default: $cfg.NCBI_API_KEY env var)')
 
     subparsers = parser.add_subparsers(dest='mode', help='Execution mode')
 
@@ -1446,7 +1387,7 @@ Examples:
     interactive_parser.add_argument('--year', type=int, default=None,
                                     help='Year (default: current year)')
     interactive_parser.add_argument('--pathogen', type=str, default='hepatitis_a',
-                                    choices=list(PATHOGENS.keys()),
+                                    choices=list(cfg.PATHOGENS.keys()),
                                     help='Pathogen to search (default: hepatitis_a)')
 
     # Option 2: Batch PMCID download
@@ -1459,7 +1400,7 @@ Examples:
     scheduled_parser = subparsers.add_parser('scheduled',
                                               help='Download previous month (for cron/scheduled use)')
     scheduled_parser.add_argument('--pathogen', type=str, default='hepatitis_a',
-                                   choices=list(PATHOGENS.keys()),
+                                   choices=list(cfg.PATHOGENS.keys()),
                                    help='Pathogen to search (default: hepatitis_a)')
 
     return parser
@@ -1499,7 +1440,7 @@ def main():
                 interactive_mode=True
             )
             print("\nInteractive download complete")
-            print(f"Check {LOG_PATH} for detailed logs and summaries")
+            print(f"Check {cfg.LOG_PATH} for detailed logs and summaries")
 
         elif args.mode == 'batch':
             logging.info(f"Batch PMCID mode (CSV: {args.csv})")

@@ -4,8 +4,7 @@ Golden Ground Truth Converter
 Converts manually labelled Excel ground truth files (Salmonella and E. coli)
 into standardised JSON format for GEPA evaluation.
 
-Input:  Excel files in /content/drive/MyDrive/AI6129/design/golden/
-Output: One JSON file per PMCID in /content/drive/MyDrive/AI6129/ground_truth/golden/
+Paths are loaded from config.py (GOLDEN_GT_INPUT_PATH and GOLDEN_GT_PATH).
 
 Author: Luqman (AI6129 Pathogen Tracking Project)
 Date:   February 2026
@@ -21,19 +20,18 @@ from pathlib import Path
 
 import openpyxl
 
+from config import cfg  # #changed - centralised configuration
+
 # ===========================================================================
-# Configuration
+# Configuration (from config.py)
 # ===========================================================================
-INPUT_DIR = "/content/drive/MyDrive/AI6129/design/golden"
-OUTPUT_DIR = "/content/drive/MyDrive/AI6129/ground_truth/golden"
+INPUT_DIR = cfg.GOLDEN_GT_INPUT_PATH   # #changed
+OUTPUT_DIR = cfg.GOLDEN_GT_PATH        # #changed
 
 # Salmonella file name (single file, all PMCIDs)
-SALMONELLA_FILE = "salmonella_golden-gt_manual-labelled.xlsx"
-
-# E.coli file naming pattern: {PMCID}Isolates_with_linking.xlsx
-#                              {PMCID}others.xlsx
-ECOLI_ISOLATES_SUFFIX = "Isolates_with_linking.xlsx"
-ECOLI_OTHERS_SUFFIX = "others.xlsx"
+SALMONELLA_FILE = cfg.SALMONELLA_FILE          # #changed
+ECOLI_ISOLATES_SUFFIX = cfg.ECOLI_ISOLATES_SUFFIX  # #changed
+ECOLI_OTHERS_SUFFIX = cfg.ECOLI_OTHERS_SUFFIX      # #changed
 
 # Logging setup
 logging.basicConfig(

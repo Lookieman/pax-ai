@@ -6,9 +6,6 @@
 # Primary environments: VSCode, AWS Bedrock, Google Colab (fallback)
 # =============================================================================
 
-from dotenv import load_dotenv
-load_dotenv()
-
 # ---------------------------------------------------------------------------
 # Core Framework - DSPy (prompt programming, GEPA optimisation)
 # ---------------------------------------------------------------------------

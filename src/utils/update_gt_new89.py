@@ -9,8 +9,9 @@ Three operations:
   3. MANUAL_FIX: Change 7 records where serotype/MLST names were used as isolate IDs
 
 Usage:
-  python update_gt_new89.py /path/to/ground_truth              # dry-run (default)
-  python update_gt_new89.py /path/to/ground_truth --apply       # apply changes
+  python update_gt_new89.py                                    # dry-run, default path from config.py
+  python update_gt_new89.py /path/to/ground_truth              # dry-run, explicit path
+  python update_gt_new89.py /path/to/ground_truth --apply      # apply changes
 
 Referenced by: PMCID Action Register, DD-2026-008
 Created: 8 March 2026
@@ -21,6 +22,8 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+
+from config import cfg  # #changed - centralised configuration
 
 
 # ===================================================================
@@ -591,7 +594,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "gt_folder",
-        help="Path to folder containing PMCxxxxxxx.json ground truth files",
+        nargs="?",  # #changed - now optional, defaults to config
+        default=cfg.GROUND_TRUTH_PATH,  # #changed
+        help="Path to folder containing PMCxxxxxxx.json ground truth files "
+             "(default: from config.py)",
     )
     parser.add_argument(
         "--apply",
