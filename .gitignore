@@ -1,0 +1,100 @@
+# ---------------------------
+
+# Project specific folders
+
+# ---------------------------
+
+# old code backups
+
+src-old/
+
+# archive folder inside src
+
+src/archive/
+
+# ---------------------------
+
+# Python
+
+# ---------------------------
+
+**pycache**/
+*.py[cod]
+*$py.class
+
+# virtual environments
+
+venv/
+.venv/
+env/
+ENV/
+
+# ---------------------------
+
+# Jupyter
+
+# ---------------------------
+
+.ipynb_checkpoints/
+
+# ---------------------------
+
+# Environment / secrets
+
+# ---------------------------
+
+.env
+.env.*
+*.env
+
+# ---------------------------
+
+# Logs
+
+# ---------------------------
+
+*.log
+
+# ---------------------------
+
+# OS files
+
+# ---------------------------
+
+.DS_Store
+Thumbs.db
+
+# ---------------------------
+
+# IDE
+
+# ---------------------------
+
+.vscode/
+.idea/
+
+# ---------------------------
+
+# Temporary experiment files
+
+# ---------------------------
+
+*.tmp
+*.bak
+*.swp
+
+# ---------------------------
+
+# Data files (optional)
+
+# Uncomment if you store datasets locally
+
+# ---------------------------
+
+# data/
+
+# *.csv
+
+# *.json
+
+# *.jsonl

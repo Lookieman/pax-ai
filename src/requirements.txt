@@ -1,0 +1,60 @@
+# =============================================================================
+# AI6129 Pathogen Tracking System - Python Dependencies
+# =============================================================================
+# Generated: 08 March 2026
+# Python: 3.10+
+# Primary environments: VSCode, AWS Bedrock, Google Colab (fallback)
+# =============================================================================
+
+from dotenv import load_dotenv
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Core Framework - DSPy (prompt programming, GEPA optimisation)
+# ---------------------------------------------------------------------------
+# DSPy pulls in litellm automatically for multi-provider LLM support
+dspy
+
+# ---------------------------------------------------------------------------
+# LLM Provider SDKs
+# ---------------------------------------------------------------------------
+# Anthropic API (baseline experiments with Claude Haiku 4.5)
+# litellm handles this via dspy, but explicit install ensures compatibility
+litellm
+
+# AWS Bedrock (formal experiments - Singapore region)
+#boto3
+
+# Google Generative AI (alternative vision model for multimodal extraction)
+#google-generativeai
+
+# ---------------------------------------------------------------------------
+# Data Acquisition - PubMed / NCBI E-utilities
+# ---------------------------------------------------------------------------
+requests
+
+# ---------------------------------------------------------------------------
+# Data Processing & Analysis
+# ---------------------------------------------------------------------------
+pandas
+numpy
+openpyxl
+
+# ---------------------------------------------------------------------------
+# Statistical Testing (McNemar's test, bootstrap CIs, Holm-Bonferroni)
+# ---------------------------------------------------------------------------
+scipy
+
+# ---------------------------------------------------------------------------
+# Multimodal Extraction (figures, supplementary files)
+# ---------------------------------------------------------------------------
+attachments[office]
+Pillow
+
+# ---------------------------------------------------------------------------
+# NOTE: Standard library modules used (no pip install required)
+# ---------------------------------------------------------------------------
+# json, os, re, time, logging, gzip, shutil, csv, glob, base64, pickle,
+# argparse, copy, unicodedata
+# xml.etree.ElementTree, tarfile
+# dataclasses, datetime, enum, pathlib, typing, collections, abc
