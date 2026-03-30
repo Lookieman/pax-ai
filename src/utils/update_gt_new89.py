@@ -9,9 +9,10 @@ Three operations:
   3. MANUAL_FIX: Change 7 records where serotype/MLST names were used as isolate IDs
 
 Usage:
-  python update_gt_new89.py                                    # dry-run, default path from config.py
-  python update_gt_new89.py /path/to/ground_truth              # dry-run, explicit path
+  python update_gt_new89.py                                    # dry-run, default GT folder from config
+  python update_gt_new89.py /path/to/ground_truth              # dry-run, explicit folder
   python update_gt_new89.py /path/to/ground_truth --apply      # apply changes
+  python update_gt_new89.py --apply                            # apply changes, default GT folder
 
 Referenced by: PMCID Action Register, DD-2026-008
 Created: 8 March 2026
@@ -23,7 +24,14 @@ import json
 import sys
 from pathlib import Path
 
-from config import cfg  # #changed - centralised configuration
+# ---------------------------------------------------------------------------
+# Ensure src/ is on the import path so config can be found
+# ---------------------------------------------------------------------------
+_SRC_DIR = str(Path(__file__).resolve().parent.parent)  #changed
+if _SRC_DIR not in sys.path:  #changed
+    sys.path.insert(0, _SRC_DIR)  #changed
+
+from config import cfg  #changed
 
 
 # ===================================================================
@@ -66,7 +74,7 @@ NEW_89_PMCIDS = [
     "PMC9693821", "PMC9708683", "PMC9739812", "PMC9769515",
 ]
 
-# 5 single-isolate records: GT uses serotype name as isolate_id
+# 6 single-isolate records: GT uses serotype name as isolate_id
 # Fix: rename isolate_id to NO_ISOLATE_ID, ensure serotype field has value
 #
 # IMPORTANT: verify ensure_value against actual GT files before running.
@@ -91,6 +99,11 @@ MANUAL_FIX_SINGLE = {
         "old_id": "Salmonella typhimurium",
         "ensure_field": "serotype",
         "ensure_value": "Salmonella typhimurium",
+    },
+    "PMC7310241": {  #changed
+        "old_id": "Salmonella enterica serotype Heidelberg",
+        "ensure_field": "serotype",
+        "ensure_value": "Heidelberg",
     },
     "PMC9221781": {
         "old_id": "Salmonella species Saintpaul",
@@ -594,10 +607,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "gt_folder",
-        nargs="?",  # #changed - now optional, defaults to config
-        default=cfg.GROUND_TRUTH_PATH,  # #changed
-        help="Path to folder containing PMCxxxxxxx.json ground truth files "
-             "(default: from config.py)",
+        nargs="?",  #changed
+        default=cfg.GROUND_TRUTH_PATH,  #changed
+        help=(  #changed
+            "Path to folder containing PMCxxxxxxx.json ground truth files "  #changed
+            f"(default: {cfg.GROUND_TRUTH_PATH})"  #changed
+        ),  #changed
     )
     parser.add_argument(
         "--apply",

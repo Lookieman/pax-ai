@@ -73,6 +73,7 @@ Thumbs.db
 
 .vscode/
 .idea/
+.obsidian/
 
 # ---------------------------
 
@@ -83,6 +84,8 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+*.xlsx
+*.ini
 
 # ---------------------------
 

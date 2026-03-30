@@ -75,6 +75,12 @@ class Config:
         self.GOLDEN_GT_INPUT_PATH = os.path.join(
             self.DRIVE_BASE, "design", "golden"
         )
+        self.SUPP_GT_PATH = os.path.join(                          #changed
+            self.GROUND_TRUTH_PATH, "supp"                         #changed
+        )                                                           #changed
+        self.SUPP_GOLDEN_GT_PATH = os.path.join(                   #changed
+            self.GOLDEN_GT_PATH, "supp"                            #changed
+        )                                                           #changed
 
         # Assay extraction outputs
         self.ASSAY_BASE_PATH = os.path.join(self.DRIVE_BASE, "assay")
@@ -94,6 +100,10 @@ class Config:
             self.VALIDATION_SPLITS_DIR,
             "assay_tadp_gepa_optimised_splits.json",
         )
+        self.GEPA_SPLITS_FILE = os.path.join(                                 #changed
+            self.VALIDATION_SPLITS_DIR,                                        #changed
+            "assay_gepa_splits_v4.json",                                       #changed
+        )                                                                      #changed
 
         # Logging and tracking
         self.LOG_PATH = os.path.join(self.DRIVE_BASE, "logs")
@@ -161,15 +171,19 @@ class Config:
         # -----------------------------------------------------------------
         self.DSPY_MODEL_STRINGS = {
             "claude-haiku-4.5": "anthropic/claude-haiku-4-5-20251001",
-            "claude-sonnet-4": (
-                "bedrock/apac.anthropic.claude-sonnet-4-20250514-v1:0"
+            "claude-sonnet-4-6": (
+                "anthropic/claude-sonnet-4-6"
+            ),
+            "claude-opus-4-6": (
+                "anthropic/claude-opus-4-6"
             ),
             "amazon-nova-pro": "bedrock/apac.amazon.nova-pro-v1:0",
         }
 
         self.MODEL_PRICING = {
             "claude-haiku-4.5": {"input": 1.00, "output": 5.00},
-            "claude-sonnet-4": {"input": 3.00, "output": 15.00},
+            "claude-sonnet-4-6": {"input": 3.00, "output": 15.00},            #changed
+            "claude-opus-4-6": {"input": 15.00, "output": 75.00},             #changed
             "amazon-nova-pro": {"input": 0.80, "output": 3.20},
         }
 
@@ -193,7 +207,7 @@ class Config:
         # 7. Golden GT converter constants
         # -----------------------------------------------------------------
         self.SALMONELLA_FILE = (
-            "salmonella_golden-gt_manual-labelled.xlsx"
+            "salmonella_working_document.xlsx"
         )
         self.ECOLI_ISOLATES_SUFFIX = "Isolates_with_linking.xlsx"
         self.ECOLI_OTHERS_SUFFIX = "others.xlsx"
@@ -218,6 +232,8 @@ class Config:
             self.ATTACHMENTS_PATH,
             self.GROUND_TRUTH_PATH,
             self.GOLDEN_GT_PATH,
+            self.SUPP_GT_PATH,          #changed
+            self.SUPP_GOLDEN_GT_PATH,   #changed
             self.ASSAY_GEPA_OUTPUT,
             self.ASSAY_COT_OUTPUT,
             self.ACCESSION_OUTPUT_PATH,
@@ -242,12 +258,15 @@ class Config:
             f"  XML articles     : {self.XML_PATH}\n"
             f"  Ground truth     : {self.GROUND_TRUTH_PATH}\n"
             f"  Golden GT        : {self.GOLDEN_GT_PATH}\n"
+            f"  Supp GT          : {self.SUPP_GT_PATH}\n"           
+            f"  Supp Golden GT   : {self.SUPP_GOLDEN_GT_PATH}\n"    
             f"  Supplementary    : {self.SUPPLEMENTARY_PATH}\n"
             f"  Attachments      : {self.ATTACHMENTS_PATH}\n"
             f"  Assay GEPA out   : {self.ASSAY_GEPA_OUTPUT}\n"
             f"  Assay CoT out    : {self.ASSAY_COT_OUTPUT}\n"
             f"  Logs             : {self.LOG_PATH}\n"
             f"  Validation splits: {self.VALIDATION_SPLITS_FILE}\n"
+            f"  GEPA splits:      {self.GEPA_SPLITS_FILE}\n"                   #changed
             f"{'=' * 60}\n"
             f"  NCBI API key     : {ncbi_status}\n"
             f"  Anthropic API key: {anthropic_status}\n"

@@ -4,7 +4,8 @@ Golden Ground Truth Converter
 Converts manually labelled Excel ground truth files (Salmonella and E. coli)
 into standardised JSON format for GEPA evaluation.
 
-Paths are loaded from config.py (GOLDEN_GT_INPUT_PATH and GOLDEN_GT_PATH).
+Input:  Excel files in cfg.GOLDEN_GT_INPUT_PATH
+Output: One JSON file per PMCID in cfg.GOLDEN_GT_PATH
 
 Author: Luqman (AI6129 Pathogen Tracking Project)
 Date:   February 2026
@@ -16,22 +17,33 @@ import os
 import re
 import json
 import logging
+import sys  #changed
 from pathlib import Path
 
 import openpyxl
 
-from config import cfg  # #changed - centralised configuration
+# ---------------------------------------------------------------------------
+# Ensure src/ is on the import path so config can be found
+# ---------------------------------------------------------------------------
+_SRC_DIR = str(Path(__file__).resolve().parent.parent)  #changed
+if _SRC_DIR not in sys.path:  #changed
+    sys.path.insert(0, _SRC_DIR)  #changed
+
+from config import cfg  #changed
 
 # ===========================================================================
-# Configuration (from config.py)
+# Configuration (paths and constants from centralised config)
 # ===========================================================================
-INPUT_DIR = cfg.GOLDEN_GT_INPUT_PATH   # #changed
-OUTPUT_DIR = cfg.GOLDEN_GT_PATH        # #changed
+INPUT_DIR = cfg.GOLDEN_GT_INPUT_PATH  #changed
+OUTPUT_DIR = cfg.GOLDEN_GT_PATH  #changed
 
 # Salmonella file name (single file, all PMCIDs)
-SALMONELLA_FILE = cfg.SALMONELLA_FILE          # #changed
-ECOLI_ISOLATES_SUFFIX = cfg.ECOLI_ISOLATES_SUFFIX  # #changed
-ECOLI_OTHERS_SUFFIX = cfg.ECOLI_OTHERS_SUFFIX      # #changed
+SALMONELLA_FILE = cfg.SALMONELLA_FILE  #changed
+
+# E.coli file naming pattern: {PMCID}Isolates_with_linking.xlsx
+#                              {PMCID}others.xlsx
+ECOLI_ISOLATES_SUFFIX = cfg.ECOLI_ISOLATES_SUFFIX  #changed
+ECOLI_OTHERS_SUFFIX = cfg.ECOLI_OTHERS_SUFFIX  #changed
 
 # Logging setup
 logging.basicConfig(
@@ -50,7 +62,7 @@ INTERP_WORD_MAP = {
     "sensible": "S",       # French/Spanish for susceptible
 }
 
-VALID_INTERP = {"S", "I", "R"}
+VALID_INTERP = {"S", "I", "R", "null"}  #changed
 
 
 # ===========================================================================

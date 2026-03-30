@@ -17,7 +17,7 @@ dspy
 # ---------------------------------------------------------------------------
 # Anthropic API (baseline experiments with Claude Haiku 4.5)
 # litellm handles this via dspy, but explicit install ensures compatibility
-litellm
+litellm==1.82.6
 
 # AWS Bedrock (formal experiments - Singapore region)
 #boto3

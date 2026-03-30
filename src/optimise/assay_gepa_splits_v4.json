@@ -1,0 +1,1468 @@
+{
+  "metadata": {
+    "version": "4.0",
+    "design_decision": "DD-2026-018",
+    "created_at": "2026-03-28T16:50:06.317352",
+    "total_evaluable": 149,
+    "holdout_size": 31,
+    "validation_size": 18,
+    "training_pool_size": 100,
+    "split_30_size": 30,
+    "random_seed": 42,
+    "description": "GEPA main run splits per DD-2026-018. Holdout = 20 golden + 11 supplement. Validation = 18 stratified (12 IWL + 5 NIOAI + 1 hybrid). Training = 100 records. 30% split stratified by category."
+  },
+  "holdout_test_set": {
+    "golden": [
+      "PMC1278947",
+      "PMC2409344",
+      "PMC2694269",
+      "PMC2725854",
+      "PMC2873750",
+      "PMC2874370",
+      "PMC2958529",
+      "PMC3020606",
+      "PMC4881965",
+      "PMC4892500",
+      "PMC4932652",
+      "PMC5033494",
+      "PMC5074519",
+      "PMC5739443",
+      "PMC6667439",
+      "PMC7273606",
+      "PMC7598458",
+      "PMC7783345",
+      "PMC9641423",
+      "PMC9643863"
+    ],
+    "golden_count": 20,
+    "supplement": [
+      "PMC5145817",
+      "PMC7478631",
+      "PMC7748489",
+      "PMC8430385",
+      "PMC8913728",
+      "PMC8969412",
+      "PMC9146225",
+      "PMC9148033",
+      "PMC9323645",
+      "PMC9433600",
+      "PMC9610186"
+    ],
+    "supplement_count": 11,
+    "total": 31,
+    "categories": {
+      "IWL": 30,
+      "NIOAI": 1
+    },
+    "description": "20 golden IWL + 10 supplement IWL + 1 supplement NIOAI. IWOL not represented (stated limitation)."
+  },
+  "validation_set": {
+    "pmcids": [
+      "PMC4866840",
+      "PMC4939201",
+      "PMC5832104",
+      "PMC6307136",
+      "PMC6430326",
+      "PMC6925778",
+      "PMC6986767",
+      "PMC7460271",
+      "PMC7581672",
+      "PMC8512087",
+      "PMC8698551",
+      "PMC8784875",
+      "PMC8947133",
+      "PMC9035464",
+      "PMC9137667",
+      "PMC9216381",
+      "PMC9353134",
+      "PMC9409446"
+    ],
+    "total": 18,
+    "categories": {
+      "IWL": 12,
+      "NIOAI": 5,
+      "IWL + IWOL": 1
+    },
+    "iwl_bins": {
+      "B1_0.00-0.20": [
+        "PMC9409446",
+        "PMC9137667"
+      ],
+      "B2_0.20-0.35": [
+        "PMC9353134",
+        "PMC4866840"
+      ],
+      "B3_0.35-0.50": [
+        "PMC8698551",
+        "PMC9035464"
+      ],
+      "B4_0.50-0.65": [
+        "PMC8784875",
+        "PMC6307136"
+      ],
+      "B5_0.65-0.80": [
+        "PMC9216381",
+        "PMC6430326"
+      ],
+      "B6_0.80+": [
+        "PMC7581672",
+        "PMC6986767"
+      ]
+    },
+    "nioai": [
+      "PMC7460271",
+      "PMC4939201",
+      "PMC5832104",
+      "PMC6925778",
+      "PMC8947133"
+    ],
+    "hybrid": [
+      "PMC8512087"
+    ],
+    "description": "18 records stratified by v3 oF1 bins (IWL), category (NIOAI, hybrid), and isolate count diversity."
+  },
+  "training_pool": {
+    "pmcids": [
+      "PMC4672624",
+      "PMC4748464",
+      "PMC4806280",
+      "PMC4810482",
+      "PMC4859176",
+      "PMC4957272",
+      "PMC4994947",
+      "PMC5073282",
+      "PMC5094244",
+      "PMC5502288",
+      "PMC5544996",
+      "PMC5637494",
+      "PMC5646387",
+      "PMC5671994",
+      "PMC5794934",
+      "PMC5797408",
+      "PMC5797457",
+      "PMC5798080",
+      "PMC5887036",
+      "PMC5902092",
+      "PMC5938507",
+      "PMC5966692",
+      "PMC5985583",
+      "PMC6003729",
+      "PMC6016173",
+      "PMC6035434",
+      "PMC6230761",
+      "PMC6312689",
+      "PMC6329902",
+      "PMC6357384",
+      "PMC6378779",
+      "PMC6380132",
+      "PMC6392897",
+      "PMC6486240",
+      "PMC6639624",
+      "PMC6667484",
+      "PMC6715874",
+      "PMC6744686",
+      "PMC6817352",
+      "PMC6935380",
+      "PMC6952724",
+      "PMC6995202",
+      "PMC7054696",
+      "PMC7083181",
+      "PMC7083327",
+      "PMC7098901",
+      "PMC7168602",
+      "PMC7200987",
+      "PMC7270754",
+      "PMC7291093",
+      "PMC7310241",
+      "PMC7366320",
+      "PMC7385254",
+      "PMC7425045",
+      "PMC7433231",
+      "PMC7497748",
+      "PMC7587706",
+      "PMC7603275",
+      "PMC7643746",
+      "PMC7725340",
+      "PMC7738724",
+      "PMC7766374",
+      "PMC7767027",
+      "PMC7909088",
+      "PMC8000398",
+      "PMC8018540",
+      "PMC8073217",
+      "PMC8082823",
+      "PMC8100199",
+      "PMC8145149",
+      "PMC8253257",
+      "PMC8300615",
+      "PMC8300843",
+      "PMC8749661",
+      "PMC8777845",
+      "PMC8779851",
+      "PMC8899097",
+      "PMC8909193",
+      "PMC8926050",
+      "PMC8944838",
+      "PMC8953408",
+      "PMC9049261",
+      "PMC9190773",
+      "PMC9219668",
+      "PMC9219948",
+      "PMC9220226",
+      "PMC9221781",
+      "PMC9237969",
+      "PMC9247517",
+      "PMC9248969",
+      "PMC9251186",
+      "PMC9453559",
+      "PMC9493365",
+      "PMC9670943",
+      "PMC9693821",
+      "PMC9694878",
+      "PMC9708683",
+      "PMC9739812",
+      "PMC9769515"
+    ],
+    "total": 100,
+    "categories": {
+      "IWL": 68,
+      "NIOAI": 31,
+      "IWOL": 1
+    }
+  },
+  "split_30": {
+    "pmcids": [
+      "PMC4810482",
+      "PMC4859176",
+      "PMC4994947",
+      "PMC5502288",
+      "PMC5544996",
+      "PMC5671994",
+      "PMC5797408",
+      "PMC5798080",
+      "PMC6003729",
+      "PMC6312689",
+      "PMC6329902",
+      "PMC6357384",
+      "PMC6380132",
+      "PMC6952724",
+      "PMC7083327",
+      "PMC7270754",
+      "PMC7385254",
+      "PMC7425045",
+      "PMC7603275",
+      "PMC7767027",
+      "PMC7909088",
+      "PMC8018540",
+      "PMC8300615",
+      "PMC8779851",
+      "PMC8899097",
+      "PMC9219948",
+      "PMC9237969",
+      "PMC9453559",
+      "PMC9693821",
+      "PMC9769515"
+    ],
+    "total": 30,
+    "categories": {
+      "IWL": 20,
+      "IWOL": 1,
+      "NIOAI": 9
+    },
+    "description": "30% stratified sample of training pool (seed=42). Category-proportional."
+  },
+  "document_details": {
+    "PMC1278947": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.5,
+      "gt_isolates": "3",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC2694269": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.763,
+      "gt_isolates": "3",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC2725854": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.2,
+      "gt_isolates": "1",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC2873750": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "2",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC2874370": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.5,
+      "gt_isolates": "24",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC2958529": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.481,
+      "gt_isolates": "5",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC3020606": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "1",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC5074519": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.602,
+      "gt_isolates": "55",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC5739443": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.538,
+      "gt_isolates": "95",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC4892500": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.576,
+      "gt_isolates": "73",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC4932652": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "5",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC7598458": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.431,
+      "gt_isolates": "5",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC7783345": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "7",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC9641423": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "53",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC9643863": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": 0.451,
+      "gt_isolates": "31",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC7273606": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC2409344": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "19",
+      "source": "Golden",
+      "diagnostic": "format_mismatch"
+    },
+    "PMC4881965": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": "Golden",
+      "diagnostic": "gt_data_not_in_article"
+    },
+    "PMC5033494": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "128",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC6667439": {
+      "category": "IWL",
+      "role": "holdout_golden",
+      "v3_oF1": null,
+      "gt_isolates": "43",
+      "source": "Golden",
+      "diagnostic": "mixed_issues"
+    },
+    "PMC4748464": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.333,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC4866840": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.316,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC4957272": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.364,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC4994947": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.453,
+      "gt_isolates": "8",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5094244": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.286,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5145817": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.413,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5671994": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.556,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5797408": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": 0.444,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5798080": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": 0.4,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5832104": {
+      "category": "NIOAI",
+      "role": "validation",
+      "v3_oF1": 0.364,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5887036": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.364,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC5985583": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.286,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6230761": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.222,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6307136": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.649,
+      "gt_isolates": "5",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6357384": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.353,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6378779": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.556,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6430326": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.745,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "acceptable"
+    },
+    "PMC6486240": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.533,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6639624": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.0,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6715874": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.444,
+      "gt_isolates": "35",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6744686": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.2,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6925778": {
+      "category": "NIOAI",
+      "role": "validation",
+      "v3_oF1": 0.444,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6935380": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.631,
+      "gt_isolates": "7",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC6986767": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.919,
+      "gt_isolates": "7",
+      "source": "New 89",
+      "diagnostic": "acceptable"
+    },
+    "PMC7083181": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.222,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7098901": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.0,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7291093": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.0,
+      "gt_isolates": "6",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7385254": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.714,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7425045": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.4,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7460271": {
+      "category": "NIOAI",
+      "role": "validation",
+      "v3_oF1": 0.0,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7478631": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.767,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7497748": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.314,
+      "gt_isolates": "5",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7603275": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.222,
+      "gt_isolates": "6",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7656189": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.222,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7738724": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7748489": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.541,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC7766374": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.052,
+      "gt_isolates": "14",
+      "source": "New 89",
+      "diagnostic": "honest_failure"
+    },
+    "PMC7909088": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.556,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8000398": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.538,
+      "gt_isolates": "7",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8018540": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.457,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8145149": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.412,
+      "gt_isolates": "3",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8512087": {
+      "category": "IWL + IWOL",
+      "role": "validation",
+      "v3_oF1": 0.667,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8698551": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.439,
+      "gt_isolates": "8",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8784875": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.533,
+      "gt_isolates": "11",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8899097": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.6,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8913728": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.496,
+      "gt_isolates": "14",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8944838": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.333,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC8953408": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.571,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9035464": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.471,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9146225": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.954,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9148033": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.766,
+      "gt_isolates": "6",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9190773": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.4,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9216381": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.696,
+      "gt_isolates": "3",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9219668": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.278,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9220226": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.292,
+      "gt_isolates": "6",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9247517": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.0,
+      "gt_isolates": "3",
+      "source": "New 89",
+      "diagnostic": "honest_failure"
+    },
+    "PMC9323645": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.522,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9353134": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.242,
+      "gt_isolates": "21",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9409446": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.0,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "honest_failure"
+    },
+    "PMC9610186": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": 0.488,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9670943": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.571,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "acceptable"
+    },
+    "PMC9693821": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": 0.444,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9708683": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.293,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9739812": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.397,
+      "gt_isolates": "10",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC9769515": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.736,
+      "gt_isolates": "4",
+      "source": "New 89",
+      "diagnostic": "eval_normalisation"
+    },
+    "PMC4939201": {
+      "category": "NIOAI",
+      "role": "validation",
+      "v3_oF1": 0.2,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC6392897": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.364,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC6667484": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.222,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC6952724": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": 0.25,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC7310241": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.4,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC7587706": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.087,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "id_is_mlst_pfge"
+    },
+    "PMC9137667": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.077,
+      "gt_isolates": "2",
+      "source": "New 89",
+      "diagnostic": "id_is_mlst"
+    },
+    "PMC9221781": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.2,
+      "gt_isolates": "1",
+      "source": "New 89",
+      "diagnostic": "id_is_serotype"
+    },
+    "PMC5073282": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.41,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC5797457": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.916,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC7083327": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": 0.0,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC7581672": {
+      "category": "IWL",
+      "role": "validation",
+      "v3_oF1": 0.846,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC7767027": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.894,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC8082823": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.667,
+      "gt_isolates": "0",
+      "source": "New 89",
+      "diagnostic": "over_extraction"
+    },
+    "PMC6817352": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": "10+45",
+      "source": "Orig Val",
+      "diagnostic": "id_mismatch"
+    },
+    "PMC9237969": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": "19 (1 actual)",
+      "source": "Orig Val",
+      "diagnostic": "entity_level_error"
+    },
+    "PMC4672624": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC4806280": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC4810482": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC4859176": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC5502288": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC5544996": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.826,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC5637494": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC5646387": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC5794934": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC5902092": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC5938507": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.2,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "gt_data_not_in_article"
+    },
+    "PMC5966692": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC6003729": {
+      "category": "IWOL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC6016173": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC6035434": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC6312689": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.667,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "gt_update_needed"
+    },
+    "PMC6329902": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC6380132": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC6995202": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC7054696": {
+      "category": "NIOAI",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC7168602": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC7200987": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.889,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "gt_update_needed"
+    },
+    "PMC7270754": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC7366320": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.821,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC7433231": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC7643746": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC7725340": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC8073217": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.839,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8100199": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC8253257": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.753,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8300615": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.763,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8300843": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.852,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8430385": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC8749661": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.717,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8777845": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.787,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8779851": {
+      "category": "NIOAI",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC8909193": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.0,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC8926050": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "mixed_issues"
+    },
+    "PMC8947133": {
+      "category": "NIOAI",
+      "role": "validation",
+      "v3_oF1": 0.799,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "no_isolates_only_assayinformation"
+    },
+    "PMC8969412": {
+      "category": "IWL",
+      "role": "holdout_supplement",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC9049261": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.858,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC9219948": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": 0.883,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC9248969": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.857,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC9251186": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": 0.888,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "major_gt_update"
+    },
+    "PMC9433600": {
+      "category": "NIOAI",
+      "role": "holdout_supplement",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC9453559": {
+      "category": "IWL",
+      "role": "training_30pct",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "over_extraction"
+    },
+    "PMC9493365": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    },
+    "PMC9694878": {
+      "category": "IWL",
+      "role": "training_100pct_only",
+      "v3_oF1": null,
+      "gt_isolates": null,
+      "source": null,
+      "diagnostic": "format_mismatch"
+    }
+  }
+}
