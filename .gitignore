@@ -11,7 +11,13 @@ src-old/
 # archive folder inside src
 
 src/archive/
+
+# json files used for aicore
+src/aicore/deployment_endpoints.json
+src/aicore/*-sk.json
+
 notebooks/archive/
+aicore/
 
 # ---------------------------
 
