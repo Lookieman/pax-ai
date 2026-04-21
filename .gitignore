@@ -13,7 +13,7 @@ src-old/
 src/archive/
 
 # json files used for aicore
-src/aicore/deployment_endpoints.json
+src/aicore/deployment*.json
 src/aicore/*-sk.json
 
 notebooks/archive/
@@ -92,6 +92,7 @@ Thumbs.db
 *.swp
 *.xlsx
 *.ini
+*.json
 
 # ---------------------------
 

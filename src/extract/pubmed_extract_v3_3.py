@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-PubMed Article Downloader v3.2 - Command-Line Interface
+PubMed Article Downloader v3.3 - Command-Line Interface
 
 Usage:
-  python pubmed_extract_v3_2.py interactive --month June --year 2025
-  python pubmed_extract_v3_2.py batch --csv pmcid_list.csv
-  python pubmed_extract_v3_2.py scheduled
+  python pubmed_extract_v3_3.py interactive --month June --year 2025
+  python pubmed_extract_v3_3.py batch --csv pmcid_list.csv
+  python pubmed_extract_v3_3.py scheduled
 
 Requirements:
   - cfg.NCBI_API_KEY environment variable (or pass via --api-key)
@@ -14,7 +14,11 @@ Requirements:
 Version History:
   v3.0  - PMID-to-PMCID conversion, full-text XML from PMC
   v3.1  - Ground-truth download, supplementary file extraction
-  v3.2  - CSV-based batch input, argparse CLI, standalone script
+  v3.3  - CSV-based batch input, argparse CLI, standalone script
+  v3.3  - Migrate supplementary download from FTP tarball to AWS S3
+          individual file download via HTTPS (no AWS CLI/account needed).
+          FTP-based functions retained but deprecated.
+          Ref: DD-2026-047, NCBI PMC FTP retirement Aug 2026.
 """
 
 import requests
@@ -52,6 +56,7 @@ DATABASE = "pubmed"
 RETMODE_XML = "xml"
 USE_HISTORY = "y"
 PMC_PDF_BASE = "https://www.ncbi.nlm.nih.gov/pmc/articles"
+S3_HTTPS_BASE = "https://pmc-oa-opendata.s3.amazonaws.com"  #changed_10042026
 
 
 # =============================================================================
@@ -94,7 +99,7 @@ def setup_logging():
         force=True,
     )
     logging.info(f"Logging initialised. Log file: {log_filename}")
-    logging.info("PubMed Article Downloader v3.2 (CLI)")
+    logging.info("PubMed Article Downloader v3.3 (CLI)")
 
 
 def check_project_dir():
@@ -385,7 +390,7 @@ def generate_download_summary(tracking_df, date_start, date_end):
     success_rate = (fulltext_success / total_processed * 100) if total_processed > 0 else 0
 
     summary = f"""
-    ===== PUBMED ARTICLE DOWNLOADER v3.2 - SUMMARY REPORT =====
+    ===== PUBMED ARTICLE DOWNLOADER v3.3 - SUMMARY REPORT =====
     Date Range: {date_start} to {date_end}
     Execution Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -610,7 +615,7 @@ def parse_month_input(month_input, year_input=None):
 
 
 # =============================================================================
-# PMCID COLLECTION (v3.2: CSV-based + backward-compatible directory scan)
+# PMCID COLLECTION (v3.3: CSV-based + backward-compatible directory scan)
 # =============================================================================
 
 def extract_pmcid_from_filename(filename: str) -> Optional[str]:
@@ -652,7 +657,7 @@ def collect_pmcids_from_directory(directory: str) -> List[str]:
     return pmcid_list
 
 
-def load_pmcids_from_csv(csv_path: str) -> List[str]:  #changed - NEW function for v3.2
+def load_pmcids_from_csv(csv_path: str) -> List[str]:  #changed - NEW function for v3.3
     """
     Load PMCIDs from a CSV file.
 
@@ -742,7 +747,8 @@ def load_pmcids_from_csv(csv_path: str) -> List[str]:  #changed - NEW function f
 
 
 # =============================================================================
-# OA FILE LIST & SUPPLEMENTARY
+# OA FILE LIST & SUPPLEMENTARY (DEPRECATED - FTP being retired Aug 2026)
+# Retained for backward compatibility. Use S3 functions below instead.
 # =============================================================================
 
 def load_oa_file_list(force_refresh: bool = False) -> Optional[Dict[str, str]]:
@@ -999,28 +1005,236 @@ def sanitise_filename(filename: str) -> str:
     return safe_name
 
 
+def _resolve_duplicate_path(output_path: Path) -> Path:                        #changed_10042026
+    """Return a non-colliding path by appending _1, _2, etc."""                #changed_10042026
+    if not output_path.exists():                                               #changed_10042026
+        return output_path                                                     #changed_10042026
+    counter = 1                                                                #changed_10042026
+    stem = output_path.stem                                                    #changed_10042026
+    suffix = output_path.suffix                                                #changed_10042026
+    while output_path.exists():                                                #changed_10042026
+        output_path = output_path.parent / f"{stem}_{counter}{suffix}"         #changed_10042026
+        counter += 1                                                           #changed_10042026
+    return output_path                                                         #changed_10042026
+
+
+# =============================================================================
+# SUPPLEMENTARY DOWNLOAD VIA AWS S3 (v3.3)                                     #changed_10042026
+# Replaces FTP tarball workflow. Uses HTTPS to fetch JSON metadata and
+# individual supplementary files from PMC Open Access S3 bucket.
+# No AWS account or CLI required.
+# =============================================================================
+
+# Pattern for inline figure/table/equation images (not supplementary)
+_FIGURE_PATTERN = re.compile(                                                  #changed_10042026
+    r'\.(g|t|e)\d+\.(jpg|jpeg|png|gif|tif|tiff)$', re.IGNORECASE              #changed_10042026
+)                                                                              #changed_10042026
+
+# Pattern for supplementary file naming (e.g. pone.0202286.s001.xlsx)
+_SUPP_NAMING_PATTERN = re.compile(r'\.s\d+\.\w+$', re.IGNORECASE)             #changed_10042026
+
+# Extensions considered supplementary when not matched by figure pattern
+_SUPP_EXTENSIONS = {                                                           #changed_10042026
+    '.xlsx', '.xls', '.csv', '.docx', '.doc', '.pdf', '.txt',                 #changed_10042026
+    '.zip', '.png', '.jpg', '.jpeg', '.tiff', '.tif', '.eps', '.svg',         #changed_10042026
+    '.pptx', '.ppt', '.tsv', '.gz', '.fasta', '.fna', '.gbk',                #changed_10042026
+}                                                                              #changed_10042026
+
+
+def _is_supplementary_file(filename: str) -> bool:                             #changed_10042026
+    """Determine whether a media_url filename is a supplementary file.         #changed_10042026
+                                                                               #changed_10042026
+    Supplementary files are identified by either:                              #changed_10042026
+      - the .sNNN. naming convention (e.g. pone.0202286.s001.xlsx)             #changed_10042026
+      - having a supplementary-type extension AND not being an                 #changed_10042026
+        inline figure/table/equation image                                     #changed_10042026
+    """                                                                        #changed_10042026
+    if _SUPP_NAMING_PATTERN.search(filename):                                  #changed_10042026
+        return True                                                            #changed_10042026
+    ext = Path(filename).suffix.lower()                                        #changed_10042026
+    if ext in _SUPP_EXTENSIONS and not _FIGURE_PATTERN.search(filename):       #changed_10042026
+        return True                                                            #changed_10042026
+    return False                                                               #changed_10042026
+
+
+def _s3_url_to_https(s3_url: str) -> str:                                     #changed_10042026
+    """Convert s3://pmc-oa-opendata/... URL to HTTPS URL.                      #changed_10042026
+                                                                               #changed_10042026
+    Strips the ?md5= query parameter if present.                               #changed_10042026
+    """                                                                        #changed_10042026
+    s3_path = s3_url.replace("s3://pmc-oa-opendata/", "")                      #changed_10042026
+    s3_path = s3_path.split("?")[0]                                            #changed_10042026
+    return f"{S3_HTTPS_BASE}/{s3_path}"                                        #changed_10042026
+
+
+def download_supplementary_s3(pmcid: str, version: int = 1,                   #changed_10042026
+                               retry_count: int = 0) -> Dict:                 #changed_10042026
+    """Download supplementary files for a PMCID from AWS S3 via HTTPS.         #changed_10042026
+                                                                               #changed_10042026
+    Fetches the JSON metadata for the article version, filters media_urls      #changed_10042026
+    for supplementary files, and downloads each individually.                  #changed_10042026
+                                                                               #changed_10042026
+    Args:                                                                      #changed_10042026
+        pmcid:       Normalised PMCID (e.g. 'PMC6118388')                      #changed_10042026
+        version:     Article version number (default 1)                        #changed_10042026
+        retry_count: Internal retry counter                                    #changed_10042026
+                                                                               #changed_10042026
+    Returns:                                                                   #changed_10042026
+        Dict with keys: status, files_downloaded, manifest                     #changed_10042026
+    """                                                                        #changed_10042026
+    prefix = f"{pmcid}.{version}"                                              #changed_10042026
+    json_url = f"{S3_HTTPS_BASE}/{prefix}/{prefix}.json"                       #changed_10042026
+    output_dir = Path(cfg.SUPPLEMENTARY_PATH) / pmcid                          #changed_10042026
+    manifest_path = output_dir / "manifest.json"                               #changed_10042026
+    max_retries = 3                                                            #changed_10042026
+                                                                               #changed_10042026
+    result = {                                                                 #changed_10042026
+        'status': 'pending',                                                   #changed_10042026
+        'files_downloaded': [],                                                #changed_10042026
+        'manifest': None                                                       #changed_10042026
+    }                                                                          #changed_10042026
+                                                                               #changed_10042026
+    try:                                                                       #changed_10042026
+        # 1. Check existing manifest                                          #changed_10042026
+        if manifest_path.exists():                                             #changed_10042026
+            with open(manifest_path, 'r', encoding='utf-8') as f:             #changed_10042026
+                existing_manifest = json.load(f)                               #changed_10042026
+            if existing_manifest.get('download_status') == 'success':          #changed_10042026
+                logging.info(f"Skipping {pmcid} - supplementary already downloaded")  #changed_10042026
+                result['status'] = 'skipped'                                   #changed_10042026
+                result['manifest'] = existing_manifest                         #changed_10042026
+                return result                                                  #changed_10042026
+                                                                               #changed_10042026
+        # 2. Fetch JSON metadata from S3                                      #changed_10042026
+        logging.info(f"Fetching S3 metadata for {pmcid} (version {version})") #changed_10042026
+        time.sleep(cfg.PMC_RATE_LIMIT_DELAY)                                   #changed_10042026
+        meta_response = requests.get(json_url, timeout=30)                     #changed_10042026
+                                                                               #changed_10042026
+        if meta_response.status_code == 404:                                   #changed_10042026
+            logging.warning(f"{pmcid} not found on S3 (version {version})")    #changed_10042026
+            result['status'] = 'not_found'                                     #changed_10042026
+            return result                                                      #changed_10042026
+                                                                               #changed_10042026
+        if meta_response.status_code != 200:                                   #changed_10042026
+            raise Exception(                                                   #changed_10042026
+                f"S3 metadata HTTP {meta_response.status_code} for {pmcid}"    #changed_10042026
+            )                                                                  #changed_10042026
+                                                                               #changed_10042026
+        metadata = meta_response.json()                                        #changed_10042026
+                                                                               #changed_10042026
+        # 3. Filter media_urls for supplementary files                        #changed_10042026
+        media_urls = metadata.get('media_urls', [])                            #changed_10042026
+        supp_urls = []                                                         #changed_10042026
+        for s3_url in media_urls:                                              #changed_10042026
+            raw_path = s3_url.split("?")[0]                                    #changed_10042026
+            filename = Path(raw_path).name                                     #changed_10042026
+            if _is_supplementary_file(filename):                               #changed_10042026
+                supp_urls.append(s3_url)                                       #changed_10042026
+                                                                               #changed_10042026
+        if not supp_urls:                                                      #changed_10042026
+            logging.info(f"{pmcid} has no supplementary files in S3 metadata") #changed_10042026
+            result['status'] = 'no_supplementary'                              #changed_10042026
+            return result                                                      #changed_10042026
+                                                                               #changed_10042026
+        logging.info(                                                          #changed_10042026
+            f"{pmcid}: {len(supp_urls)} supplementary files "                  #changed_10042026
+            f"(of {len(media_urls)} total media) to download"                  #changed_10042026
+        )                                                                      #changed_10042026
+                                                                               #changed_10042026
+        # 4. Download each supplementary file                                 #changed_10042026
+        output_dir.mkdir(parents=True, exist_ok=True)                          #changed_10042026
+        downloaded_files = []                                                  #changed_10042026
+                                                                               #changed_10042026
+        for s3_url in supp_urls:                                               #changed_10042026
+            raw_path = s3_url.split("?")[0]                                    #changed_10042026
+            filename = Path(raw_path).name                                     #changed_10042026
+            https_url = _s3_url_to_https(s3_url)                               #changed_10042026
+                                                                               #changed_10042026
+            time.sleep(cfg.PMC_RATE_LIMIT_DELAY)                               #changed_10042026
+            file_response = requests.get(https_url, timeout=60, stream=True)   #changed_10042026
+                                                                               #changed_10042026
+            if file_response.status_code == 200:                               #changed_10042026
+                safe_name = sanitise_filename(filename)                        #changed_10042026
+                save_path = _resolve_duplicate_path(output_dir / safe_name)    #changed_10042026
+                safe_name = save_path.name                                     #changed_10042026
+                                                                               #changed_10042026
+                with open(save_path, 'wb') as f:                               #changed_10042026
+                    for chunk in file_response.iter_content(chunk_size=8192):   #changed_10042026
+                        if chunk:                                              #changed_10042026
+                            f.write(chunk)                                     #changed_10042026
+                                                                               #changed_10042026
+                file_size = save_path.stat().st_size                           #changed_10042026
+                file_info = {                                                  #changed_10042026
+                    'original_name': filename,                                 #changed_10042026
+                    'saved_as': safe_name,                                     #changed_10042026
+                    'extension': Path(filename).suffix,                        #changed_10042026
+                    'size_bytes': file_size,                                   #changed_10042026
+                    's3_url': s3_url                                           #changed_10042026
+                }                                                              #changed_10042026
+                downloaded_files.append(file_info)                             #changed_10042026
+                logging.debug(f"Downloaded: {filename} -> {safe_name}")        #changed_10042026
+            else:                                                              #changed_10042026
+                logging.warning(                                               #changed_10042026
+                    f"Failed to download {filename} for {pmcid}: "             #changed_10042026
+                    f"HTTP {file_response.status_code}"                        #changed_10042026
+                )                                                              #changed_10042026
+                                                                               #changed_10042026
+        # 5. Write manifest                                                   #changed_10042026
+        manifest = {                                                           #changed_10042026
+            'pmcid': pmcid,                                                    #changed_10042026
+            'version': version,                                                #changed_10042026
+            'download_date': datetime.now().strftime('%Y%m%d_%H%M%S'),         #changed_10042026
+            'download_status': 'success',                                      #changed_10042026
+            'source': 'aws_s3',                                                #changed_10042026
+            'license': metadata.get('license_code'),                           #changed_10042026
+            'files_count': len(downloaded_files),                              #changed_10042026
+            'files': downloaded_files                                          #changed_10042026
+        }                                                                      #changed_10042026
+                                                                               #changed_10042026
+        with open(manifest_path, 'w', encoding='utf-8') as f:                 #changed_10042026
+            json.dump(manifest, f, indent=2)                                   #changed_10042026
+                                                                               #changed_10042026
+        result['status'] = 'success'                                           #changed_10042026
+        result['files_downloaded'] = downloaded_files                          #changed_10042026
+        result['manifest'] = manifest                                          #changed_10042026
+        logging.info(                                                          #changed_10042026
+            f"Downloaded {len(downloaded_files)} supplementary files "         #changed_10042026
+            f"for {pmcid}"                                                     #changed_10042026
+        )                                                                      #changed_10042026
+                                                                               #changed_10042026
+    except Exception as e:                                                     #changed_10042026
+        logging.error(                                                         #changed_10042026
+            f"Failed to download supplementary for {pmcid}: {str(e)}"          #changed_10042026
+        )                                                                      #changed_10042026
+        if retry_count < max_retries:                                          #changed_10042026
+            logging.info(f"Retrying {pmcid} (attempt {retry_count + 1})")      #changed_10042026
+            time.sleep(cfg.PMC_RATE_LIMIT_DELAY * 2)                           #changed_10042026
+            return download_supplementary_s3(pmcid, version,                   #changed_10042026
+                                              retry_count + 1)                 #changed_10042026
+        result['status'] = 'failed'                                            #changed_10042026
+        result['error'] = str(e)                                               #changed_10042026
+                                                                               #changed_10042026
+    return result                                                              #changed_10042026
+
+
 def batch_download_supplementary(pmcid_list: List[str]) -> Optional[Dict]:
-    """Download supplementary files for a list of PMCIDs."""
+    """Download supplementary files for a list of PMCIDs via AWS S3.            #changed_10042026
+
+    v3.3: Uses S3 HTTPS metadata lookup instead of FTP tarball download.       #changed_10042026
+    No OA file list download or AWS account/CLI required.                      #changed_10042026
+    """                                                                        #changed_10042026
     stats = {
         'total': len(pmcid_list),
         'success': 0,
         'skipped': 0,
-        'not_in_oa': 0,
-        'not_found': 0,
+        'not_found': 0,                                                        #changed_10042026
         'failed': 0,
         'no_supplementary': 0,
-        'total_files_extracted': 0
+        'total_files_downloaded': 0                                            #changed_10042026
     }
 
     Path(cfg.SUPPLEMENTARY_PATH).mkdir(parents=True, exist_ok=True)
-    logging.info("Loading OA file list for supplementary lookup...")
-    pmcid_to_ftp = load_oa_file_list()
-
-    if pmcid_to_ftp is None:
-        logging.error("Cannot proceed without OA file list")
-        return stats
-
-    logging.info(f"OA index contains {len(pmcid_to_ftp)} articles")
+    logging.info("Starting supplementary download via AWS S3...")               #changed_10042026
 
     for idx, pmcid in enumerate(pmcid_list, 1):
         pmcid_upper = pmcid.strip().upper()
@@ -1030,32 +1244,30 @@ def batch_download_supplementary(pmcid_list: List[str]) -> Optional[Dict]:
         if idx % 10 == 0:
             logging.info(f"Supplementary download progress: {idx}/{len(pmcid_list)}")
             logging.info(f"  Current stats - Success: {stats['success']}, "
-                         f"Not in OA: {stats['not_in_oa']}, Failed: {stats['failed']}")
+                         f"Not found: {stats['not_found']}, "                  #changed_10042026
+                         f"Failed: {stats['failed']}")
 
-        ftp_path = pmcid_to_ftp.get(pmcid_upper)
-
-        if ftp_path is None:
-            logging.debug(f"{pmcid_upper} not in OA subset - no supplementary available via FTP")
-            stats['not_in_oa'] += 1
-            continue
-
-        result = download_supplementary_package(pmcid_upper, ftp_path)
+        result = download_supplementary_s3(pmcid_upper)                        #changed_10042026
 
         if result['status'] == 'success':
-            files_count = len(result['files_extracted'])
+            files_count = len(result['files_downloaded'])                       #changed_10042026
             if files_count > 0:
                 stats['success'] += 1
-                stats['total_files_extracted'] += files_count
+                stats['total_files_downloaded'] += files_count                 #changed_10042026
             else:
                 stats['no_supplementary'] += 1
 
         elif result['status'] == 'skipped':
             stats['skipped'] += 1
             if result['manifest'] and 'files_count' in result['manifest']:
-                stats['total_files_extracted'] += result['manifest']['files_count']
+                stats['total_files_downloaded'] += result['manifest']['files_count']  #changed_10042026
 
-        elif result['status'] == 'not_found':
-            stats['not_found'] += 1
+        elif result['status'] == 'not_found':                                  #changed_10042026
+            stats['not_found'] += 1                                            #changed_10042026
+
+        elif result['status'] == 'no_supplementary':                           #changed_10042026
+            stats['no_supplementary'] += 1                                     #changed_10042026
+
         else:
             stats['failed'] += 1
 
@@ -1065,11 +1277,10 @@ def batch_download_supplementary(pmcid_list: List[str]) -> Optional[Dict]:
     logging.info(f"Total PMCIDs processed: {stats['total']}")
     logging.info(f"Success (with files): {stats['success']}")
     logging.info(f"Skipped (already downloaded): {stats['skipped']}")
-    logging.info(f"Not in OA subset: {stats['not_in_oa']}")
-    logging.info(f"Package not found on FTP: {stats['not_found']}")
-    logging.info(f"No supplementary files in package: {stats['no_supplementary']}")
+    logging.info(f"Not found on S3: {stats['not_found']}")                     #changed_10042026
+    logging.info(f"No supplementary files: {stats['no_supplementary']}")
     logging.info(f"Failed: {stats['failed']}")
-    logging.info(f"Total supplementary files extracted: {stats['total_files_extracted']}")
+    logging.info(f"Total supplementary files downloaded: {stats['total_files_downloaded']}")  #changed_10042026
     logging.info("=" * 60)
 
     return stats
@@ -1208,7 +1419,7 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
             supp_stats = batch_download_supplementary(successful_pmcids)
         else:  #changed_08042026
             logging.info("Supplementary download skipped (download_supp=False)")  #changed_08042026
-            supp_stats = {'success': 0, 'failed': 0, 'not_in_oa': 0}  #changed_08042026
+            supp_stats = {'success': 0, 'failed': 0, 'not_found': 0}  #changed_10042026
 
         logging.info(f"Processing complete:")
         logging.info(f"  Full-text XML success: {success_count}")
@@ -1216,7 +1427,7 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
         logging.info(f"  Missing PMCIDs: {len(missing_pmcid_list)}")
         logging.info(f"  Supp success: {supp_stats['success']}")
         logging.info(f"  Supp failed: {supp_stats['failed']}")
-        logging.info(f"  Supp not in OA: {supp_stats['not_in_oa']}")
+        logging.info(f"  Supp not found on S3: {supp_stats['not_found']}")    #changed_10042026
 
         generate_download_summary(tracking_df, date_start, date_end)
         return tracking_df
@@ -1228,14 +1439,14 @@ def search_and_download_articles(pathogen_key: str, date_start: str = None,
 
 
 # =============================================================================
-# BATCH PMCID DOWNLOAD (Option 2 - v3.2)
+# BATCH PMCID DOWNLOAD (Option 2 - v3.3)
 # =============================================================================
 
-def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed - core v3.2 function
+def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed - core v3.3 function
     """
     Download full-text XML and supplementary files for PMCIDs.
 
-    PMCIDs are loaded from a CSV file (v3.2 default) or, for backward
+    PMCIDs are loaded from a CSV file (v3.3 default) or, for backward
     compatibility, from JSON filenames in the ground_truth directory.
 
     Args:
@@ -1308,7 +1519,7 @@ def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed 
             logging.error(f"Failed to fetch XML for {pmcid}")
 
     # Step 3: Download supplementary files
-    logging.info("PHASE 2: Downloading supplementary files from FTP...")
+    logging.info("PHASE 2: Downloading supplementary files from AWS S3...")    #changed_10042026
     success_pmcid = [pmcid for pmcid in pmcid_list if pmcid not in failed_pmcids]
     supp_stats = batch_download_supplementary(success_pmcid)
 
@@ -1320,7 +1531,7 @@ def download_batch_pmcid_xml(csv_path: str = None) -> Optional[Dict]:  #changed 
         'failed_pmcids': failed_pmcids,  #changed - include failed list in summary
         'supp_success': supp_stats['success'],
         'supp_skipped': supp_stats['skipped'],
-        'supp_not_in_oa': supp_stats['not_in_oa'],
+        'supp_not_found': supp_stats['not_found'],                             #changed_10042026
         'supp_failed': supp_stats['failed'],
     }
 
@@ -1344,7 +1555,7 @@ def print_batch_summary(summary):  #changed - extracted summary printing
     print(f"SUPPLEMENTARY FILES:")
     print(f"  Successfully downloaded: {summary['supp_success']}")
     print(f"  Skipped (already exist): {summary['supp_skipped']}")
-    print(f"  Not in OA subset: {summary['supp_not_in_oa']}")
+    print(f"  Not found on S3: {summary['supp_not_found']}")                   #changed_10042026
     print(f"  Failed: {summary['supp_failed']}")
 
     if summary['xml_failed'] > 0:
@@ -1358,25 +1569,25 @@ def print_batch_summary(summary):  #changed - extracted summary printing
 def build_parser() -> argparse.ArgumentParser:
     """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
-        prog='pubmed_extract_v3_2',
-        description='PubMed Article Downloader v3.2 - Download full-text XML and supplementary files',
+        prog='pubmed_extract_v3_3',
+        description='PubMed Article Downloader v3.3 - Download full-text XML and supplementary files',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Interactive search by pathogen and month
-  python pubmed_extract_v3_2.py interactive --month June --year 2025
+  python pubmed_extract_v3_3.py interactive --month June --year 2025
 
   # Batch download from PMCID list in CSV
-  python pubmed_extract_v3_2.py batch --csv pmcid_list.csv
+  python pubmed_extract_v3_3.py batch --csv pmcid_list.csv
 
   # Scheduled mode (downloads previous month automatically)
-  python pubmed_extract_v3_2.py scheduled
+  python pubmed_extract_v3_3.py scheduled
 
   # Override base directory and API key
-  python pubmed_extract_v3_2.py batch --csv ids.csv --base-dir /data/pubmed --api-key YOUR_KEY
+  python pubmed_extract_v3_3.py batch --csv ids.csv --base-dir /data/pubmed --api-key YOUR_KEY
 
   # Custom output directories for XML and supplementary files
-  python pubmed_extract_v3_2.py interactive --month June --year 2025 --xml-dir /data/xml --supp-dir /data/supp
+  python pubmed_extract_v3_3.py interactive --month June --year 2025 --xml-dir /data/xml --supp-dir /data/supp
         """
     )
 
@@ -1447,7 +1658,7 @@ def main():
     # Initialise logging and directories
     setup_logging()
     logging.info("Starting main execution")
-    logging.info("PubMed Article Downloader v3.2 (CLI)")
+    logging.info("PubMed Article Downloader v3.3 (CLI)")
     check_project_dir()
 
     try:

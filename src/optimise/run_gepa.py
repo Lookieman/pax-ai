@@ -1,25 +1,31 @@
 """
-run_gepa.py
-===========
-CLI entry point for GEPA prompt optimisation of assay extraction.
+run_gepa.py (AICORE BRANCH)
+============================
+CLI entry point for GEPA prompt optimisation of assay extraction
+using SAP AI Core model deployments.
+
+Changes from main branch:
+- Uses AICoreLanguageModel instead of dspy.LM
+- Adds --service-key for AI Core authentication
+- Adds --no-resume for clean checkpoint restarts
+- Model keys resolve via deployment_endpoints.json
 
 Usage:
-    python run_gepa.py --split-pct 100 --max-full-evals 60
-    python run_gepa.py --split-pct 30  --max-full-evals 60
-    python run_gepa.py --split-pct 100 --max-full-evals 5 --smoke-test
-    python run_gepa.py --split-pct 100 --dry-run
-
-Output is written to:
-    <DRIVE_BASE>/assay/gepa/<experiment_name>/
+    python optimise/run_gepa.py --service-key c:/proj/pax-ai/src/aicore/sk.json --split-pct 30 --max-full-evals 5 --quiet
+    python optimise/run_gepa.py --service-key c:/proj/pax-ai/src/aicore/sk.json --split-pct 100 --max-full-evals 5 --quiet
+    python optimise/run_gepa.py --service-key c:/proj/pax-ai/src/aicore/sk.json --smoke-test --quiet
+    python optimise/run_gepa.py --service-key c:/proj/pax-ai/src/aicore/sk.json --dry-run
 
 Author: Luqman (AI6129 Pathogen Tracking Project)
 Date:   March 2026
+Branch: aicore
 Design Decision: DD-2026-018
 """
 
 import sys
 import os
 import json
+import shutil
 import time
 import logging
 import argparse
@@ -47,12 +53,7 @@ from optimise.feedback_metric import gepa_feedback_metric                      #
 # ===========================================================================
 
 def setup_logging(log_dir: Path, experiment_name: str) -> None:
-    """Configure logging to both console and file.
-
-    Args:
-        log_dir: Directory for the log file.
-        experiment_name: Used in the log filename.
-    """
+    """Configure logging to both console and file."""
     log_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_dir / f"gepa_{experiment_name}_{timestamp}.log"
@@ -73,13 +74,9 @@ def setup_logging(log_dir: Path, experiment_name: str) -> None:
 # ===========================================================================
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments.
-
-    Returns:
-        Namespace with all CLI arguments.
-    """
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="GEPA optimisation for assay extraction (DD-2026-018)."
+        description="GEPA optimisation for assay extraction via SAP AI Core (DD-2026-018)."
     )
 
     parser.add_argument(
@@ -92,34 +89,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--max-full-evals",
         type=int,
-        default=60,
-        help="GEPA budget: number of full validation evaluations (default: 60).",
+        default=5,
+        help="GEPA budget: number of full validation evaluations (default: 5).",
     )
     parser.add_argument(
         "--experiment-name",
         type=str,
         default=None,
-        help="Experiment name for output directory (default: auto-generated).",
+        help="Experiment name for output directory. Use a fixed name to "
+             "enable GEPA checkpoint resume (default: auto-generated).",
     )
     parser.add_argument(
         "--student-model",
         type=str,
-        default="claude-sonnet-4-6",
-        choices=list(cfg.DSPY_MODEL_STRINGS.keys()),
-        help="Student model key (default: claude-sonnet-4-6).",
+        default="claude-4.5-sonnet",
+        help="Student model key or deployment name (default: claude-4.5-sonnet).",
     )
     parser.add_argument(
         "--reflection-model",
         type=str,
-        default="claude-opus-4-6",
-        choices=list(cfg.DSPY_MODEL_STRINGS.keys()),
-        help="Reflection model key (default: claude-opus-4-6).",
+        default="claude-4.5-opus",
+        help="Reflection model key or deployment name (default: claude-4.5-opus).",
     )
     parser.add_argument(
         "--num-threads",
         type=int,
-        default=4,
-        help="Number of parallel evaluation threads (default: 4).",
+        default=2,                                                             #changed: conservative for AI Core
+        help="Number of parallel evaluation threads (default: 2).",
     )
     parser.add_argument(
         "--seed",
@@ -133,6 +129,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override path to splits JSON (default: from config).",
     )
+    parser.add_argument(                                                       #changed
+        "--service-key", "-k",                                                 #changed
+        type=str,                                                              #changed
+        default=None,                                                          #changed
+        help="Path to SAP AI Core service key JSON file.",                     #changed
+    )                                                                          #changed
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -141,13 +143,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--smoke-test",
         action="store_true",
-        help="Override max-full-evals to 5 for pipeline verification.",
+        help="Override max-full-evals to 3 for pipeline verification.",         #changed: 3 for aicore
+    )
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress DSPy's internal INFO logs from console.",
     )
     parser.add_argument(                                                       #changed
-        "--quiet", "-q",                                                       #changed
+        "--no-resume",                                                         #changed
         action="store_true",                                                   #changed
-        help="Suppress DSPy's internal INFO logs from console. "               #changed
-             "Logs are still written to log_dir.",                              #changed
+        help="Delete existing programme and checkpoint before starting. "      #changed
+             "Use when you want a clean run.",                                 #changed
     )                                                                          #changed
 
     return parser.parse_args()
@@ -164,51 +171,35 @@ def estimate_cost(
     student_model: str,
     reflection_model: str,
 ) -> dict:
-    """Estimate the cost of a GEPA run.
+    """Estimate the cost of a GEPA run."""
+    student_pricing = cfg.MODEL_PRICING.get(
+        student_model, {"input": 3.0, "output": 15.0}
+    )
+    # Per-call estimate: ~25K input + ~4K output for long articles             #changed
+    per_extraction = (25000 * student_pricing["input"] / 1_000_000
+                      + 4000 * student_pricing["output"] / 1_000_000)          #changed
 
-    Uses per-call cost estimates based on typical article lengths.
+    per_reflection = (30000 * 15.0 / 1_000_000                                #changed
+                      + 5000 * 75.0 / 1_000_000)                              #changed
 
-    Args:
-        n_train: Number of training examples.
-        n_val: Number of validation examples.
-        max_full_evals: GEPA budget parameter.
-        student_model: Student model key.
-        reflection_model: Reflection model key.
+    total_rollouts = max_full_evals * (n_train + n_val)                        #changed
+    est_iterations = max_full_evals * 5  # approx iterations
 
-    Returns:
-        Dictionary with cost breakdown.
-    """
-    # Per-call estimates (USD) based on ~12K input + ~2K output tokens
-    student_pricing = cfg.MODEL_PRICING.get(student_model, {"input": 3.0, "output": 15.0})
-    per_extraction = (12000 * student_pricing["input"] / 1_000_000
-                      + 2000 * student_pricing["output"] / 1_000_000)
-
-    # Reflection cost (Opus: ~8K input + ~3K output)
-    per_reflection = (8000 * 15.0 / 1_000_000
-                      + 3000 * 75.0 / 1_000_000)
-
-    # Per iteration: minibatch (3 extractions) + 1 reflection
-    # ~50% of iterations trigger a full validation eval
-    est_iterations = max_full_evals * 2
-    minibatch_cost = est_iterations * 3 * per_extraction
+    extraction_cost = total_rollouts * per_extraction
     reflection_cost = est_iterations * per_reflection
-    full_eval_cost = max_full_evals * n_val * per_extraction
-
-    total_usd = minibatch_cost + reflection_cost + full_eval_cost
-    total_sgd = total_usd * 1.35
+    total_usd = extraction_cost + reflection_cost
 
     return {
         "max_full_evals": max_full_evals,
         "n_train": n_train,
         "n_val": n_val,
-        "est_iterations": est_iterations,
+        "total_rollouts": total_rollouts,                                      #changed
         "per_extraction_usd": round(per_extraction, 4),
         "per_reflection_usd": round(per_reflection, 4),
-        "minibatch_cost_usd": round(minibatch_cost, 2),
+        "extraction_cost_usd": round(extraction_cost, 2),
         "reflection_cost_usd": round(reflection_cost, 2),
-        "full_eval_cost_usd": round(full_eval_cost, 2),
         "total_usd": round(total_usd, 2),
-        "total_sgd": round(total_sgd, 2),
+        "total_sgd": round(total_usd * 1.35, 2),
     }
 
 
@@ -224,19 +215,12 @@ def save_experiment_metadata(
     n_holdout: int,
     cost_estimate: dict,
 ) -> None:
-    """Save experiment configuration and metadata to JSON.
-
-    Args:
-        output_dir: Output directory.
-        args: Parsed CLI arguments.
-        n_train: Number of training examples.
-        n_val: Number of validation examples.
-        n_holdout: Number of holdout examples.
-        cost_estimate: Cost estimate dictionary.
-    """
+    """Save experiment configuration and metadata to JSON."""
     metadata = {
         "experiment_name": args.experiment_name,
         "design_decision": "DD-2026-018",
+        "branch": "aicore",                                                    #changed
+        "platform": "SAP AI Core",                                             #changed
         "timestamp": datetime.now().isoformat(),
         "split_pct": args.split_pct,
         "max_full_evals": args.max_full_evals,
@@ -262,47 +246,64 @@ def save_experiment_metadata(
 # ===========================================================================
 
 def main() -> None:
-    """GEPA optimisation pipeline: load data, configure, optimise, save."""
+    """GEPA optimisation pipeline via SAP AI Core."""
 
     args = parse_args()
 
     # --- Override for smoke test ---
     if args.smoke_test:
-        args.max_full_evals = 5
-        logging.info("Smoke test mode: max_full_evals overridden to 5")
+        args.max_full_evals = 3                                                #changed: 3 for aicore
+        logging.info("Smoke test mode: max_full_evals overridden to 3")
 
     # --- Generate experiment name ---
     if args.experiment_name is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         args.experiment_name = (
             f"assay_{args.split_pct}pct_"
-            f"evals{args.max_full_evals}_"
-            f"{timestamp}"
+            f"evals{args.max_full_evals}"
         )
+        # No timestamp — enables checkpoint resume by default                  #changed
 
     # --- Output directory ---
     output_dir = Path(cfg.ASSAY_GEPA_OUTPUT) / args.experiment_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # --- GEPA log directory ---
-    gepa_log_dir = str(output_dir / "gepa_logs")
+    gepa_log_dir = output_dir / "gepa_logs"
+
+    # --- No-resume: clean slate ---                                           #changed
+    if args.no_resume:                                                         #changed
+        programme_path = output_dir / "optimised_programme.json"               #changed
+        if programme_path.exists():                                            #changed
+            programme_path.unlink()                                            #changed
+            print(f"  --no-resume: deleted {programme_path}")                  #changed
+        if gepa_log_dir.exists():                                              #changed
+            shutil.rmtree(gepa_log_dir)                                        #changed
+            print(f"  --no-resume: deleted {gepa_log_dir}")                    #changed
 
     # --- Logging ---
     setup_logging(Path(cfg.LOG_PATH), args.experiment_name)
-    logging.info("GEPA optimisation starting")
+    logging.info("GEPA optimisation starting (AICORE BRANCH)")                 #changed
     logging.info("Arguments: %s", vars(args))
     logging.info("Output directory: %s", output_dir)
 
-    # --- Quiet mode: suppress DSPy internal logs from console ---             #changed
-    if args.quiet:                                                             #changed
-        for _name in ("dspy", "dspy.evaluate", "dspy.teleprompt",              #changed
-                      "dspy.teleprompt.gepa", "dspy.teleprompt.gepa.gepa",     #changed
-                      "litellm", "httpx"):                                     #changed
-            logging.getLogger(_name).setLevel(logging.WARNING)                 #changed
-        logging.info("Quiet mode enabled: DSPy/LiteLLM INFO logs suppressed") #changed
+    # --- Quiet mode ---
+    if args.quiet:
+        for _name in ("dspy", "dspy.evaluate", "dspy.teleprompt",
+                      "dspy.teleprompt.gepa", "dspy.teleprompt.gepa.gepa",
+                      "litellm", "httpx"):
+            logging.getLogger(_name).setLevel(logging.WARNING)
+        logging.info("Quiet mode enabled: DSPy/LiteLLM INFO logs suppressed")
+
+    # --- Load AI Core credentials ---                                         #changed
+    if args.service_key:                                                       #changed
+        from aicore.aicore_lm import set_service_key                           #changed_020426
+        set_service_key(args.service_key)                                      #changed_020426
+        logging.info("AI Core credentials loaded from %s", args.service_key)   #changed
+    else:                                                                      #changed
+        cfg.load_service_key_if_exists()                                       #changed
 
     # --- Load splits ---
-    splits_filepath = args.splits_file or Path(cfg.GEPA_SPLITS_FILE)           #changed
+    splits_filepath = args.splits_file or Path(cfg.GEPA_SPLITS_FILE)
     splits = load_splits(splits_filepath)
 
     # --- Build datasets ---
@@ -329,7 +330,7 @@ def main() -> None:
 
     # --- Pre-flight summary ---
     print(f"\n{'=' * 60}")
-    print(f"  GEPA OPTIMISATION PRE-FLIGHT (DD-2026-018)")
+    print(f"  GEPA OPTIMISATION PRE-FLIGHT (AICORE BRANCH)")                   #changed
     print(f"{'=' * 60}")
     print(f"  Experiment:       {args.experiment_name}")
     print(f"  Training split:   {args.split_pct}% ({len(trainset)} records)")
@@ -338,13 +339,14 @@ def main() -> None:
     print(f"  Student model:    {args.student_model}")
     print(f"  Reflection model: {args.reflection_model}")
     print(f"  max_full_evals:   {args.max_full_evals}")
+    print(f"  Total rollouts:   {cost_estimate['total_rollouts']}")            #changed
     print(f"  num_threads:      {args.num_threads}")
     print(f"  seed:             {args.seed}")
     print(f"  Output:           {output_dir}")
     print(f"  Est. cost:        ${cost_estimate['total_usd']:.2f} USD "
           f"/ ${cost_estimate['total_sgd']:.2f} SGD")
+    print(f"  Quiet mode:       {args.quiet}")
     print(f"  Dry run:          {args.dry_run}")
-    print(f"  Quiet mode:       {args.quiet}")                                 #changed
     print(f"{'=' * 60}\n")
 
     # --- Save metadata ---
@@ -358,35 +360,31 @@ def main() -> None:
         logging.info("Dry run complete. Exiting without GEPA execution.")
         return
 
-    # --- Configure DSPy models ---
-    student_model_string = cfg.DSPY_MODEL_STRINGS[args.student_model]
-    reflection_model_string = cfg.DSPY_MODEL_STRINGS[args.reflection_model]
+    # --- Configure AI Core LMs ---                                            #changed
+    from aicore.aicore_lm import AICoreLanguageModel                           #changed
 
-    student_lm_kwargs = {
-        "model": student_model_string,
-        "max_tokens": 64000,
-    }
-    reflection_lm_kwargs = {
-        "model": reflection_model_string,
-        "temperature": 1.0,
-        "max_tokens": 32000,
-    }
+    student_name = cfg.resolve_model(args.student_model)                       #changed_020426
+    reflection_name = cfg.resolve_model(args.reflection_model)                 #changed_020426
 
-    # Set API keys based on provider
-    if student_model_string.startswith("anthropic/"):
-        student_lm_kwargs["api_key"] = cfg.ANTHROPIC_API_KEY
-    if reflection_model_string.startswith("anthropic/"):
-        reflection_lm_kwargs["api_key"] = cfg.ANTHROPIC_API_KEY
+    student_lm = AICoreLanguageModel(                                          #changed
+        model_name=student_name,                                               #changed
+        temperature=0.0,                                                       #changed
+        max_tokens=64000,                                                      #changed
+    )                                                                          #changed
+    reflection_lm = AICoreLanguageModel(                                       #changed
+        model_name=reflection_name,                                            #changed
+        temperature=1.0,                                                       #changed
+        max_tokens=32000,                                                      #changed
+    )                                                                          #changed
 
-    student_lm = dspy.LM(**student_lm_kwargs)
-    reflection_lm = dspy.LM(**reflection_lm_kwargs)
-
-    dspy.configure(lm=student_lm)
-    logging.info("Student LM configured: %s", student_model_string)
-    logging.info("Reflection LM configured: %s", reflection_model_string)
+    dspy.configure(lm=student_lm)                                              #changed
+    logging.info("Student LM (AI Core): %s", student_name)                     #changed
+    logging.info("Reflection LM (AI Core): %s", reflection_name)               #changed
 
     # --- Configure and run GEPA ---
     logging.info("Initialising GEPA optimiser...")
+
+    gepa_log_dir.mkdir(parents=True, exist_ok=True)                            #changed
 
     optimizer = dspy.GEPA(
         metric=gepa_feedback_metric,
@@ -395,13 +393,13 @@ def main() -> None:
         seed=args.seed,
         track_stats=True,
         track_best_outputs=True,
-        log_dir=gepa_log_dir,
+        log_dir=str(gepa_log_dir),
         reflection_minibatch_size=3,
         reflection_lm=reflection_lm,
         use_merge=True,
         failure_score=0.0,
         perfect_score=1.0,
-        gepa_kwargs={"use_cloudpickle": True},                                 #changed: avoid StringSignature pickle error
+        gepa_kwargs={"use_cloudpickle": True},
     )
 
     programme = AssayExtractor()
@@ -426,7 +424,6 @@ def main() -> None:
     if hasattr(optimised, "detailed_results") and optimised.detailed_results:
         detailed = optimised.detailed_results
 
-        # Save what is serialisable
         results_to_save = {
             "val_aggregate_scores": (
                 detailed.val_aggregate_scores
@@ -443,7 +440,7 @@ def main() -> None:
             json.dump(results_to_save, f, indent=2, default=str)
         logging.info("Detailed results saved: %s", results_filepath)
 
-    # --- Print evolved prompt ---
+    # --- Save evolved prompt ---
     try:
         predictors = optimised.predictors()
         if predictors:
@@ -460,9 +457,31 @@ def main() -> None:
     except Exception as e:
         logging.warning("Could not extract evolved prompt: %s", e)
 
+    # --- Log AI Core usage ---                                                #changed
+    try:                                                                       #changed
+        student_usage = student_lm.get_usage_summary()                         #changed
+        reflection_usage = reflection_lm.get_usage_summary()                   #changed
+        usage_summary = {                                                      #changed
+            "student": student_usage,                                          #changed
+            "reflection": reflection_usage,                                    #changed
+        }                                                                      #changed
+        usage_filepath = output_dir / "aicore_usage.json"                      #changed
+        with open(usage_filepath, "w", encoding="utf-8") as f:                 #changed
+            json.dump(usage_summary, f, indent=2)                              #changed
+        logging.info(                                                          #changed
+            "AI Core usage: student=%d calls (%.0fs), "                        #changed
+            "reflection=%d calls (%.0fs)",                                     #changed
+            student_usage["request_count"],                                    #changed
+            student_usage["total_inference_time"],                              #changed
+            reflection_usage["request_count"],                                 #changed
+            reflection_usage["total_inference_time"],                           #changed
+        )                                                                      #changed
+    except Exception as e:                                                     #changed
+        logging.warning("Could not log AI Core usage: %s", e)                  #changed
+
     # --- Final summary ---
     print(f"\n{'=' * 60}")
-    print(f"  GEPA OPTIMISATION COMPLETE")
+    print(f"  GEPA OPTIMISATION COMPLETE (AICORE)")                            #changed
     print(f"{'=' * 60}")
     print(f"  Duration:         {elapsed / 60:.1f} minutes")
     print(f"  Output:           {output_dir}")
@@ -470,7 +489,8 @@ def main() -> None:
     print(f"  GEPA logs:        {gepa_log_dir}")
     print(f"{'=' * 60}\n")
     print(f"  Next step: run holdout inference with:")
-    print(f"    python run_holdout.py --programme {programme_filepath}")
+    print(f"    python optimise/run_holdout.py --service-key {args.service_key} "
+          f"--programme {programme_filepath}")
     print(f"{'=' * 60}\n")
 
 

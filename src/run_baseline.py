@@ -120,10 +120,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        default="claude-haiku-4.5",
-        choices=list(cfg.DSPY_MODEL_STRINGS.keys()),
-        help="Model key from config.DSPY_MODEL_STRINGS (default: claude-haiku-4.5).",
+        default="claude-4.5-sonnet",                                           #changed_020426
+        help="Model key or AI Core name (default: claude-4.5-sonnet).",        #changed_020426
     )
+    parser.add_argument(                                                       #changed_020426
+        "--service-key", "-k",                                                 #changed_020426
+        type=str,                                                              #changed_020426
+        default=None,                                                          #changed_020426
+        help="Path to AI Core config JSON (SDK format or raw service key).",   #changed_020426
+    )                                                                          #changed_020426
     parser.add_argument(
         "--output-label",
         type=str,
@@ -302,38 +307,34 @@ def load_raw_extraction(pmcid: str, raw_output_dir: Path) -> dict:         #chan
 # DSPy LM configuration
 # ===========================================================================
 
-def configure_dspy_lm(model_key: str) -> None:
-    """Configure DSPy language model from config.
+def configure_dspy_lm(model_key: str, service_key: str = None) -> None:       #changed_020426
+    """Configure DSPy language model via SAP AI Core.                          #changed_020426
 
-    Resolves the model string from cfg.DSPY_MODEL_STRINGS and sets up
-    the appropriate API key and parameters.
+    Resolves the model string from cfg.DSPY_MODEL_STRINGS and sets up          #changed_020426
+    the AICoreLanguageModel using the gen_ai_hub SDK.                          #changed_020426
 
-    Args:
-        model_key: Key into cfg.DSPY_MODEL_STRINGS.
-    """
-    model_string = cfg.DSPY_MODEL_STRINGS[model_key]
-    logging.info("Configuring DSPy LM: %s -> %s", model_key, model_string)
+    Args:                                                                      #changed_020426
+        model_key: Key into cfg.DSPY_MODEL_STRINGS or direct AI Core name.     #changed_020426
+        service_key: Path to AI Core config JSON (optional if env var set).    #changed_020426
+    """                                                                        #changed_020426
+    from aicore.aicore_lm import AICoreLanguageModel, set_service_key          #changed_020426
 
-    # Determine API key based on model provider
-    lm_kwargs = {
-        "model": model_string,
-        "max_tokens": 64000,
-    }
+    # Load credentials if provided                                             #changed_020426
+    if service_key:                                                            #changed_020426
+        set_service_key(service_key)                                           #changed_020426
+    else:                                                                      #changed_020426
+        cfg.load_service_key_if_exists()                                       #changed_020426
 
-    if model_string.startswith("anthropic/"):
-        lm_kwargs["api_key"] = cfg.ANTHROPIC_API_KEY
-        if not cfg.ANTHROPIC_API_KEY:
-            logging.warning("ANTHROPIC_API_KEY is not set")
+    model_name = cfg.resolve_model(model_key)                                  #changed_020426
+    logging.info("Configuring DSPy LM: %s -> %s", model_key, model_name)      #changed_020426
 
-    elif model_string.startswith("bedrock/"):
-        # Bedrock uses AWS credentials from environment
-        os.environ.setdefault("AWS_ACCESS_KEY_ID", cfg.AWS_ACCESS_KEY_ID)
-        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", cfg.AWS_SECRET_ACCESS_KEY)
-        os.environ.setdefault("AWS_DEFAULT_REGION", cfg.AWS_REGION_NAME)
-
-    extraction_lm = dspy.LM(**lm_kwargs)
-    dspy.configure(lm=extraction_lm)
-    logging.info("DSPy LM configured successfully")
+    extraction_lm = AICoreLanguageModel(                                       #changed_020426
+        model_name=model_name,                                                 #changed_020426
+        max_tokens=64000,                                                      #changed_020426
+        temperature=0.0,                                                       #changed_020426
+    )                                                                          #changed_020426
+    dspy.configure(lm=extraction_lm)                                           #changed_020426
+    logging.info("DSPy LM configured successfully (AI Core)")                  #changed_020426
 
 
 # ===========================================================================
@@ -508,7 +509,7 @@ def main() -> None:
 
     # --- Configure DSPy LM (skip for rescore-only) ---                        #changed
     if not is_rescore_only:                                                     #changed
-        configure_dspy_lm(args.model)
+        configure_dspy_lm(args.model, service_key=args.service_key)             #changed_020426
 
     # --- Run extraction + evaluation ---
     if not is_rescore_only:                                                     #changed
@@ -519,13 +520,10 @@ def main() -> None:
     start_time = time.time()
 
     for i, pmcid in enumerate(run_list):
-        if (i + 1) % 10 == 0 or (i + 1) == len(run_list):                     #changed
-            elapsed = time.time() - start_time
-            rate = (i + 1) / elapsed if elapsed > 0 else 0
-            logging.info(
-                "Progress: %d/%d (%.1f docs/min)",
-                i + 1, len(run_list), rate * 60                                #changed
-            )
+        logging.info(                                                          #changed_060426
+            "Processing %d/%d: %s",                                            #changed_060426
+            i + 1, len(run_list), pmcid,                                       #changed_060426
+        )                                                                      #changed_060426
 
         # Use pre-resolved paths                                              #changed
         pmcid_paths = resolved[pmcid]

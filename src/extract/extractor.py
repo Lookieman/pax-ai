@@ -55,11 +55,18 @@ EMPTY_RESULT = {
 # ---------------------------------------------------------------------------
 
 class AssayExtractor(dspy.Module):
-    """Chain-of-Thought extractor using the v4 AssayExtractionSignature."""
+    """Extractor using the v4 AssayExtractionSignature.
 
-    def __init__(self):
+    Supports both Chain-of-Thought (default) and bare Predict modes.
+    Use use_cot=False to run the ablation baseline (dspy.Predict).
+    """
+
+    def __init__(self, use_cot: bool = True):                                  #changed_16042026
         super().__init__()
-        self.predictor = dspy.ChainOfThought(AssayExtractionSignature)
+        if use_cot:                                                             #changed_16042026
+            self.predictor = dspy.ChainOfThought(AssayExtractionSignature)     #changed_16042026
+        else:                                                                   #changed_16042026
+            self.predictor = dspy.Predict(AssayExtractionSignature)            #changed_16042026
 
     def forward(self, article_text: str) -> dspy.Prediction:
         """Run extraction on article text.

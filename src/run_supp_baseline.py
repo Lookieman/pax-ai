@@ -14,6 +14,7 @@ Usage:
     python run_supp_baseline.py --pmcid-list path/to/supp_pmcids.txt
     python run_supp_baseline.py --pmcid-list supp_pmcids.txt --model claude-haiku-4.5 --dry-run
     python run_supp_baseline.py --pmcid-list supp_pmcids.txt --golden-pmcids golden_supp.txt
+    python run_supp_baseline.py --pmcid-list supp_pmcids.txt --programme path/to/optimised.json --output-label v5_supp_gepa_sonnet45
 
 Output is written to:
     <DRIVE_BASE>/assay/gt_diagnostic_analysis/<output-label>/
@@ -108,10 +109,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model",
         type=str,
-        default="claude-haiku-4.5",
-        choices=list(cfg.DSPY_MODEL_STRINGS.keys()),
-        help="Model key from config.DSPY_MODEL_STRINGS (default: claude-haiku-4.5).",
+        default="claude-4.5-sonnet",                                           #changed_020426
+        help="Model key or AI Core name (default: claude-4.5-sonnet).",        #changed_020426
     )
+    parser.add_argument(                                                       #changed_020426
+        "--service-key", "-k",                                                 #changed_020426
+        type=str,                                                              #changed_020426
+        default=None,                                                          #changed_020426
+        help="Path to AI Core config JSON (SDK format or raw service key).",   #changed_020426
+    )                                                                          #changed_020426
     parser.add_argument(
         "--output-label",
         type=str,
@@ -148,11 +154,30 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional file listing golden supp PMCIDs (uses golden supp GT dir).",
     )
+    parser.add_argument(                                                       #changed_120426
+        "--programme",                                                         #changed_120426
+        type=Path,                                                             #changed_120426
+        default=None,                                                          #changed_120426
+        help="Path to GEPA-optimised programme JSON. When provided, loads "    #changed_120426
+             "the optimised prompt into the extractor (Pass 2). When omitted, "#changed_120426
+             "uses default CoT (Pass 1).",                                     #changed_120426
+    )                                                                          #changed_120426
     parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate inputs and report file manifest only; no LLM calls.",
     )
+    parser.add_argument(                                                       #changed_120426
+        "--quiet", "-q",                                                       #changed_120426
+        action="store_true",                                                   #changed_120426
+        help="Suppress DSPy's internal INFO logs from console.",               #changed_120426
+    )                                                                          #changed_120426
+    parser.add_argument(                                                       #changed_120426
+        "--no-resume",                                                         #changed_120426
+        action="store_true",                                                   #changed_120426
+        help="Force a clean run, ignoring any previously completed "           #changed_120426
+             "extractions in the output directory.",                            #changed_120426
+    )                                                                          #changed_120426
     parser.add_argument(
         "--delay",
         type=float,
@@ -198,29 +223,25 @@ def save_raw_extraction(
 # DSPy LM configuration (reused from run_baseline.py)
 # ===========================================================================
 
-def configure_dspy_lm(model_key: str) -> None:
-    """Configure DSPy language model from config."""
-    model_string = cfg.DSPY_MODEL_STRINGS[model_key]
-    logging.info("Configuring DSPy LM: %s -> %s", model_key, model_string)
+def configure_dspy_lm(model_key: str, service_key: str = None) -> None:       #changed_020426
+    """Configure DSPy language model via SAP AI Core."""                        #changed_020426
+    from aicore.aicore_lm import AICoreLanguageModel, set_service_key          #changed_020426
 
-    lm_kwargs = {
-        "model": model_string,
-        "max_tokens": 64000,
-    }
+    if service_key:                                                            #changed_020426
+        set_service_key(service_key)                                           #changed_020426
+    else:                                                                      #changed_020426
+        cfg.load_service_key_if_exists()                                       #changed_020426
 
-    if model_string.startswith("anthropic/"):
-        lm_kwargs["api_key"] = cfg.ANTHROPIC_API_KEY
-        if not cfg.ANTHROPIC_API_KEY:
-            logging.warning("ANTHROPIC_API_KEY is not set")
+    model_name = cfg.resolve_model(model_key)                                  #changed_020426
+    logging.info("Configuring DSPy LM: %s -> %s", model_key, model_name)      #changed_020426
 
-    elif model_string.startswith("bedrock/"):
-        os.environ.setdefault("AWS_ACCESS_KEY_ID", cfg.AWS_ACCESS_KEY_ID)
-        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", cfg.AWS_SECRET_ACCESS_KEY)
-        os.environ.setdefault("AWS_DEFAULT_REGION", cfg.AWS_REGION_NAME)
-
-    extraction_lm = dspy.LM(**lm_kwargs)
-    dspy.configure(lm=extraction_lm)
-    logging.info("DSPy LM configured successfully")
+    extraction_lm = AICoreLanguageModel(                                       #changed_020426
+        model_name=model_name,                                                 #changed_020426
+        max_tokens=64000,                                                      #changed_020426
+        temperature=0.0,                                                       #changed_020426
+    )                                                                          #changed_020426
+    dspy.configure(lm=extraction_lm)                                           #changed_020426
+    logging.info("DSPy LM configured successfully (AI Core)")                  #changed_020426
 
 
 # ===========================================================================
@@ -241,6 +262,13 @@ def main() -> None:
     setup_logging(Path(cfg.LOG_PATH), args.output_label)
     logging.info("Supplementary baseline run starting")
     logging.info("Arguments: %s", vars(args))
+
+    # --- Quiet mode ---                                                       #changed_120426
+    if args.quiet:                                                             #changed_120426
+        for _name in ("dspy", "dspy.evaluate", "dspy.teleprompt",              #changed_120426
+                      "litellm", "httpx"):                                     #changed_120426
+            logging.getLogger(_name).setLevel(logging.WARNING)                 #changed_120426
+        logging.info("Quiet mode enabled")                                     #changed_120426
 
     # --- Resolve directories ---
     gt_dir_main = Path(args.gt_dir) if args.gt_dir else Path(cfg.SUPP_GT_PATH)
@@ -362,7 +390,9 @@ def main() -> None:
     print(f"  Runnable:            {len(runnable)}")
     print(f"  Total supp files:    {total_files}")
     print(f"  Model:               {args.model}")
+    print(f"  Programme:           {args.programme or '(default CoT)'}")       #changed_120426
     print(f"  Output:              {output_dir}")
+    print(f"  Quiet mode:          {args.quiet}")                              #changed_120426
     print(f"  Dry run:             {args.dry_run}")
     print(f"\n  --- File Type Distribution ---")
     for ext in sorted(ext_counts.keys()):
@@ -385,12 +415,40 @@ def main() -> None:
         return
 
     # --- Configure DSPy LM ---
-    configure_dspy_lm(args.model)
+    configure_dspy_lm(args.model, service_key=args.service_key)                 #changed_020426
 
     # --- Run extraction + evaluation ---
     extractor = SupplementaryAssayExtractor()
+
+    # --- Load optimised programme if provided (Pass 2) ---                    #changed_120426
+    if args.programme:                                                         #changed_120426
+        logging.info(                                                          #changed_120426
+            "Loading GEPA-optimised programme from %s", args.programme         #changed_120426
+        )                                                                      #changed_120426
+        extractor.load(str(args.programme))                                    #changed_120426
+        logging.info("Optimised programme loaded successfully (Pass 2)")       #changed_120426
+    else:                                                                      #changed_120426
+        logging.info("Using default CoT extractor (Pass 1)")                   #changed_120426
+
     results = []
     failed_pmcids = []
+    skipped_pmcids = []                                                        #changed_120426
+
+    # --- Resume: detect previously completed extractions ---                  #changed_120426
+    completed_pmcids = set()                                                   #changed_120426
+    if not args.no_resume:                                                     #changed_120426
+        raw_output_dir.mkdir(parents=True, exist_ok=True)                      #changed_120426
+        for existing in raw_output_dir.glob("*_supp_extraction.json"):         #changed_120426
+            completed_pmcids.add(                                              #changed_120426
+                existing.stem.replace("_supp_extraction", "")                  #changed_120426
+            )                                                                  #changed_120426
+        if completed_pmcids:                                                   #changed_120426
+            logging.info(                                                      #changed_120426
+                "Resume mode: found %d completed extractions in %s",           #changed_120426
+                len(completed_pmcids), raw_output_dir,                         #changed_120426
+            )                                                                  #changed_120426
+    else:                                                                      #changed_120426
+        logging.info("No-resume mode: all records will be re-extracted")       #changed_120426
 
     start_time = time.time()
 
@@ -409,14 +467,37 @@ def main() -> None:
         gt_dir = pmcid_paths["gt_dir"]
         xml_path = pmcid_paths["xml_path"]
 
-        # Load article text
-        article_text = load_article_text(xml_path, max_chars=args.max_chars)
-
-        # Load ground truth
+        # Load ground truth (needed for both cached and fresh paths)
         gt_data = load_ground_truth(pmcid, gt_dir)
         if gt_data is None:
             logging.warning("Skipping %s: GT is None after loading", pmcid)
             continue
+
+        # --- Resume: skip already-completed records ---                       #changed_120426
+        if pmcid in completed_pmcids:                                          #changed_120426
+            cached_path = raw_output_dir / f"{pmcid}_supp_extraction.json"     #changed_120426
+            try:                                                               #changed_120426
+                with open(cached_path, "r", encoding="utf-8") as f:            #changed_120426
+                    cached = json.load(f)                                      #changed_120426
+                ext_data = cached.get("parsed_output", {})                     #changed_120426
+                result = score_record(                                         #changed_120426
+                    pmcid=pmcid, gt_data=gt_data, ext_data=ext_data,           #changed_120426
+                )                                                              #changed_120426
+                results.append(result)                                         #changed_120426
+                skipped_pmcids.append(pmcid)                                   #changed_120426
+                logging.info(                                                  #changed_120426
+                    "Skipping %d/%d: %s (cached)",                             #changed_120426
+                    i + 1, len(runnable), pmcid,                               #changed_120426
+                )                                                              #changed_120426
+                continue                                                       #changed_120426
+            except Exception as e:                                             #changed_120426
+                logging.warning(                                               #changed_120426
+                    "Could not load cached result for %s, "                    #changed_120426
+                    "re-extracting: %s", pmcid, e,                             #changed_120426
+                )                                                              #changed_120426
+
+        # Load article text
+        article_text = load_article_text(xml_path, max_chars=args.max_chars)
 
         # Load supplementary files via attachments library
         supp_files = discover_supp_files(pmcid, supp_dir, attach_dir)
@@ -486,9 +567,10 @@ def main() -> None:
     # --- Generate report ---
     elapsed_total = time.time() - start_time
     logging.info(
-        "Extraction complete: %d/%d succeeded, %d failed, %.1f minutes",
-        len(results) - len(failed_pmcids),
+        "Extraction complete: %d/%d succeeded, %d cached, %d failed, %.1f minutes",  #changed_120426
+        len(results) - len(failed_pmcids) - len(skipped_pmcids),               #changed_120426
         len(runnable),
+        len(skipped_pmcids),                                                   #changed_120426
         len(failed_pmcids),
         elapsed_total / 60,
     )

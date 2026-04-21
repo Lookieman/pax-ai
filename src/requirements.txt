@@ -3,32 +3,33 @@
 # =============================================================================
 # Generated: 08 March 2026
 # Python: 3.10+
-# Primary environments: VSCode, AWS Bedrock, Google Colab (fallback)
+# Primary environments: VSCode, Google Colab (fallback)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
 # Core Framework - DSPy (prompt programming, GEPA optimisation)
 # ---------------------------------------------------------------------------
 # DSPy pulls in litellm automatically for multi-provider LLM support
-dspy
+dspy-ai>=3.0
+cloudpickle
 
 # ---------------------------------------------------------------------------
 # LLM Provider SDKs
 # ---------------------------------------------------------------------------
 # Anthropic API (baseline experiments with Claude Haiku 4.5)
 # litellm handles this via dspy, but explicit install ensures compatibility
-litellm==1.82.6
+litellm==1.81.5
 
-# AWS Bedrock (formal experiments - Singapore region)
-#boto3
+# HTTP requests
+requests>=2.31.0
 
-# Google Generative AI (alternative vision model for multimodal extraction)
-#google-generativeai
+# OAuth2 authentication for SAP AI Core
+requests-oauthlib>=1.3.1
+oauthlib>=3.2.2
 
-# ---------------------------------------------------------------------------
-# Data Acquisition - PubMed / NCBI E-utilities
-# ---------------------------------------------------------------------------
-requests
+# Environment variable management (local development)
+python-dotenv>=1.0.0
+
 
 # ---------------------------------------------------------------------------
 # Data Processing & Analysis
